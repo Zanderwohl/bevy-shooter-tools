@@ -11,6 +11,8 @@ pub struct MulticamPlugin {
 #[derive(Resource)]
 pub struct MulticamState {
     pub test_scene: bool,
+    pub start: UVec2,
+    pub end: UVec2,
 }
 
 #[derive(Component)]
@@ -26,6 +28,8 @@ impl Default for MulticamState {
     fn default() -> Self {
         Self {
             test_scene: false,
+            start: UVec2::ZERO,
+            end: UVec2::ONE,
         }
     }
 }
@@ -35,6 +39,7 @@ impl Plugin for MulticamPlugin {
         app
             .insert_resource(MulticamState {
                 test_scene: self.test_scene,
+                ..Default::default()
             })
             .add_systems(Startup, Self::setup)
             .add_systems(Update, Self::set_camera_viewports)
@@ -49,13 +54,25 @@ impl MulticamPlugin {
         mut meshes: ResMut<Assets<Mesh>>,
         mut materials: ResMut<Assets<StandardMaterial>>,
     ) {
+        let perspective = Projection::Perspective(PerspectiveProjection {
+            fov: 120.0,
+            ..Default::default()
+        });
+        let orthographic = Projection::Orthographic(OrthographicProjection {
+            near: 0.05,
+            far: 1000.0,
+            scaling_mode: Default::default(),
+            scale: 0.01,
+            ..OrthographicProjection::default_2d()
+        });
+
         let cameras = [
-            ("Free Camera", Transform::from_xyz(-2.5, 4.5, 9.0).looking_at(Vec3::ZERO, Vec3::Y), true),
-            ("X Camera", Transform::from_xyz(5.0, 0.0, 0.0).looking_at(Vec3::ZERO, Vec3::Y), false),
-            ("Y Camera", Transform::from_xyz(0.0, 5.0, 0.0).looking_at(Vec3::ZERO, -Vec3::X), false),
-            ("Z Camera", Transform::from_xyz(0.0, 0.0, 5.0).looking_at(Vec3::ZERO, Vec3::Y), false),
+            ("Free Camera", Transform::from_xyz(-2.5, 4.5, 9.0).looking_at(Vec3::ZERO, Vec3::Y), &perspective),
+            ("Front", Transform::from_xyz(5.0, 0.0, 0.0).looking_at(Vec3::ZERO, Vec3::Y), &orthographic),
+            ("Top", Transform::from_xyz(0.0, 5.0, 0.0).looking_at(Vec3::ZERO, -Vec3::X), &orthographic),
+            ("Right", Transform::from_xyz(0.0, 0.0, 5.0).looking_at(Vec3::ZERO, Vec3::Y), &orthographic),
         ];
-        for (idx, (camera_name, camera_pos, perspective)) in cameras.into_iter().enumerate() {
+        for (idx, (camera_name, camera_pos, projection)) in cameras.into_iter().enumerate() {
             let camera = commands
                 .spawn((
                     Camera3d::default(),
@@ -71,6 +88,7 @@ impl MulticamPlugin {
                         name: camera_name.to_string(),
                         screen_pos: UVec2::new((idx % 2) as u32, (idx / 2) as u32)
                     },
+                    projection.clone(),
                 ))
                 .id();
 
@@ -85,6 +103,12 @@ impl MulticamPlugin {
                     ))
                     .with_children(|parent| {
                         parent.spawn((
+                            Node {
+                                position_type: PositionType::Absolute,
+                                top: Val::Px(12.),
+                                left: Val::Px(12.),
+                                ..Default::default()
+                            },
                             Text::new(camera_name),
                         ));
                     });
