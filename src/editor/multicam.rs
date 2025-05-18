@@ -68,11 +68,26 @@ impl MulticamPlugin {
                     Bloom::NATURAL,
                     Tonemapping::TonyMcMapface,
                     Multicam {
-                        name: camera_name.to_owned(),
+                        name: camera_name.to_string(),
                         screen_pos: UVec2::new((idx % 2) as u32, (idx / 2) as u32)
                     },
                 ))
                 .id();
+
+                commands
+                    .spawn((
+                        UiTargetCamera(camera),
+                        Node {
+                            width: Val::Percent(100.),
+                            height: Val::Percent(100.),
+                            ..Default::default()
+                        }
+                    ))
+                    .with_children(|parent| {
+                        parent.spawn((
+                            Text::new(camera_name),
+                        ));
+                    });
         }
 
         // Only spawn the test cube if test_scene is true
