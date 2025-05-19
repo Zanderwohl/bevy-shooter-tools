@@ -1,6 +1,7 @@
 mod common;
 mod startup;
 mod editor;
+mod tool;
 
 use bevy::prelude::*;
 use bevy::window::{ExitCondition, PresentMode};
@@ -9,6 +10,7 @@ use bevy_egui::{egui, EguiContexts, EguiPlugin, EguiContextPass};
 use crate::common::lang::change_lang;
 use crate::common::perf::PerfPlugin;
 use crate::editor::multicam::MulticamPlugin;
+use crate::tool::ToolPlugin;
 
 fn main() {
     let editor_params = startup::EditorParams::new()
@@ -42,6 +44,7 @@ fn main() {
             MulticamPlugin {
                 test_scene: true,
             },
+            ToolPlugin,
             PerfPlugin,
             ))
         .run();

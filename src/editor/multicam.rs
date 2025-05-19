@@ -3,6 +3,7 @@ use bevy::core_pipeline::tonemapping::Tonemapping;
 use bevy::prelude::*;
 use bevy::render::camera::Viewport;
 use bevy::window::WindowResized;
+use bevy_egui::{egui, EguiContextPass, EguiContexts};
 
 pub struct MulticamPlugin {
     pub test_scene: bool,
@@ -11,8 +12,8 @@ pub struct MulticamPlugin {
 #[derive(Resource)]
 pub struct MulticamState {
     pub test_scene: bool,
-    pub start: UVec2,
-    pub end: UVec2,
+    pub start: Vec2,
+    pub end: Vec2,
 }
 
 #[derive(Component)]
@@ -28,8 +29,8 @@ impl Default for MulticamState {
     fn default() -> Self {
         Self {
             test_scene: false,
-            start: UVec2::ZERO,
-            end: UVec2::ONE,
+            start: Vec2::ZERO,
+            end: Vec2::ONE,
         }
     }
 }
@@ -42,7 +43,10 @@ impl Plugin for MulticamPlugin {
                 ..Default::default()
             })
             .add_systems(Startup, Self::setup)
-            .add_systems(Update, Self::set_camera_viewports)
+            .add_systems(Update, (
+                Self::set_camera_viewports,
+            ))
+            .add_systems(EguiContextPass, Self::debug_window)
         ;
     }
 }
@@ -146,18 +150,98 @@ impl MulticamPlugin {
         windows: Query<&Window>,
         mut resize_events: EventReader<WindowResized>,
         mut cameras: Query<(&mut Camera, &Multicam)>,
+        state: Res<MulticamState>,
     ) {
         for resize_event in resize_events.read() {
             let window = windows.get(resize_event.window).unwrap();
-            let size = window.physical_size() / 2;
-
-            for (mut camera, multicam) in &mut cameras {
-                camera.viewport = Some(Viewport {
-                    physical_position: multicam.screen_pos * size,
-                    physical_size: size,
-                    ..Default::default()
-                });
-            }
+            Self::calculate_resize(&mut cameras, &state, window);
         }
+        if state.is_changed() {
+            let window = windows.iter().next().unwrap();
+            Self::calculate_resize(&mut cameras, &state, window);
+        }
+    }
+
+    fn calculate_resize(mut cameras: &mut Query<(&mut Camera, &Multicam)>, state: &Res<MulticamState>, window: &Window) {
+        let window_size = window.physical_size();
+
+        // Calculate the viewport size based on start and end coordinates
+        let viewport_size = UVec2::new(
+            ((state.end.x - state.start.x) * window_size.x as f32) as u32,
+            ((state.end.y - state.start.y) * window_size.y as f32) as u32,
+        );
+
+        // Calculate the starting position of the viewport
+        let viewport_start = UVec2::new(
+            (state.start.x * window_size.x as f32) as u32,
+            (state.start.y * window_size.y as f32) as u32,
+        );
+
+        // Calculate the size of each camera's viewport (2x2 grid)
+        let camera_size = UVec2::new(
+            viewport_size.x / 2,
+            viewport_size.y / 2,
+        );
+
+        for (mut camera, multicam) in cameras {
+            // Calculate this camera's position within the viewport
+            let camera_pos = viewport_start + UVec2::new(
+                multicam.screen_pos.x * camera_size.x,
+                multicam.screen_pos.y * camera_size.y,
+            );
+
+            camera.viewport = Some(Viewport {
+                physical_position: camera_pos,
+                physical_size: camera_size,
+                ..Default::default()
+            });
+        }
+    }
+
+    fn debug_window(
+        mut state: ResMut<MulticamState>,
+        mut contexts: EguiContexts,
+    ) {
+        let ctx = contexts.ctx_mut();
+
+        egui::Window::new("Multicam Viewport").show(ctx, |ui| {
+            ui.heading("Viewport Controls");
+            
+            // Start coordinates
+            ui.heading("Start Position");
+            ui.horizontal(|ui| {
+                ui.label("X:");
+                let mut start_x = state.start.x;
+                if ui.add(egui::Slider::new(&mut start_x, 0.0..=state.end.x - 0.01)).changed() {
+                    state.start.x = start_x;
+                }
+            });
+            ui.horizontal(|ui| {
+                ui.label("Y:");
+                let mut start_y = state.start.y;
+                if ui.add(egui::Slider::new(&mut start_y, 0.0..=state.end.y - 0.01)).changed() {
+                    state.start.y = start_y;
+                }
+            });
+
+            ui.separator();
+
+            // End coordinates
+            ui.heading("End Position");
+            ui.horizontal(|ui| {
+                ui.label("X:");
+                let mut end_x = state.end.x;
+                if ui.add(egui::Slider::new(&mut end_x, (state.start.x + 0.01)..=1.0)).changed() {
+                    state.end.x = end_x;
+                }
+            });
+            ui.horizontal(|ui| {
+                ui.label("Y:");
+                let mut end_y = state.end.y;
+                if ui.add(egui::Slider::new(&mut end_y, (state.start.y + 0.01)..=1.0)).changed() {
+                    state.end.y = end_y;
+                }
+            });
+        });
     }
 }
