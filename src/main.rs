@@ -6,7 +6,7 @@ mod tool;
 use bevy::prelude::*;
 use bevy::window::{ExitCondition, PresentMode};
 use bevy_egui::{egui, EguiContexts, EguiPlugin, EguiContextPass};
-
+use bevy_vector_shapes::Shape2dPlugin;
 use crate::common::lang::change_lang;
 use crate::common::perf::PerfPlugin;
 use crate::editor::multicam::MulticamPlugin;
@@ -39,7 +39,10 @@ fn main() {
                 close_when_requested: true,
             }),
         )
-        .add_plugins(EguiPlugin { enable_multipass_for_primary_context: true })
+        .add_plugins((
+            EguiPlugin { enable_multipass_for_primary_context: true },
+            Shape2dPlugin::default(),
+        ))
         .add_plugins((
             MulticamPlugin {
                 test_scene: true,

@@ -2,8 +2,9 @@ use bevy::core_pipeline::bloom::Bloom;
 use bevy::core_pipeline::tonemapping::Tonemapping;
 use bevy::prelude::*;
 use bevy::render::camera::Viewport;
-use bevy::window::WindowResized;
+use bevy::window::{PrimaryWindow, WindowResized};
 use bevy_egui::{egui, EguiContextPass, EguiContexts};
+use bevy_vector_shapes::prelude::*;
 
 pub struct MulticamPlugin {
     pub test_scene: bool,
@@ -19,7 +20,8 @@ pub struct MulticamState {
 #[derive(Component)]
 pub struct Multicam {
     pub name: String,
-    screen_pos: UVec2,
+    pub screen_pos: UVec2,
+    pub id: u32,
 }
 
 #[derive(Component)]
@@ -30,7 +32,7 @@ impl Default for MulticamState {
         Self {
             test_scene: false,
             start: Vec2::ZERO,
-            end: Vec2::ONE,
+            end: Vec2::ONE, // This MUST be more than start or else the first frame will crash.
         }
     }
 }
@@ -45,6 +47,7 @@ impl Plugin for MulticamPlugin {
             .add_systems(Startup, Self::setup)
             .add_systems(Update, (
                 Self::set_camera_viewports,
+                Self::handle_input,
             ))
             .add_systems(EguiContextPass, Self::debug_window)
         ;
@@ -90,7 +93,8 @@ impl MulticamPlugin {
                     Tonemapping::TonyMcMapface,
                     Multicam {
                         name: camera_name.to_string(),
-                        screen_pos: UVec2::new((idx % 2) as u32, (idx / 2) as u32)
+                        screen_pos: UVec2::new((idx % 2) as u32, (idx / 2) as u32),
+                        id: idx as u32,
                     },
                     projection.clone(),
                 ))
@@ -147,7 +151,7 @@ impl MulticamPlugin {
     }
 
     fn set_camera_viewports(
-        windows: Query<&Window>,
+        windows: Query<&Window, With<PrimaryWindow>>,
         mut resize_events: EventReader<WindowResized>,
         mut cameras: Query<(&mut Camera, &Multicam)>,
         state: Res<MulticamState>,
@@ -157,7 +161,7 @@ impl MulticamPlugin {
             Self::calculate_resize(&mut cameras, &state, window);
         }
         if state.is_changed() {
-            let window = windows.iter().next().unwrap();
+            let window = windows.single().unwrap();
             Self::calculate_resize(&mut cameras, &state, window);
         }
     }
@@ -243,5 +247,17 @@ impl MulticamPlugin {
                 }
             });
         });
+    }
+
+    fn handle_input(
+        mut state: ResMut<MulticamState>,
+        mouse_buttons: Res<ButtonInput<MouseButton>>,
+        windows: Query<&Window, With<PrimaryWindow>>,
+        cameras: Query<(&Camera, &GlobalTransform, &Multicam)>,
+        mut painter: ShapePainter,
+    ) {
+        let window = windows.single().unwrap();
+
+        let mouse = window.cursor_position();
     }
 }
