@@ -3,6 +3,7 @@ use bevy::prelude::{Plugin, ResMut, Resource};
 use bevy_egui::{egui, EguiContextPass, EguiContexts};
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
+use crate::get;
 
 pub struct ToolPlugin;
 
@@ -35,20 +36,29 @@ pub enum Tools {
     Move,
 }
 
+impl Tools {
+    fn name(&self) -> String {
+        match self {
+            Self::Select => get!("tools.select"),
+            Self::Move => get!("tools.move"),
+        }
+    }
+}
+
 impl ToolPlugin {
     fn toolbar(mut contexts: EguiContexts, mut tool_state: ResMut<ToolState>) {
         let ctx = contexts.ctx_mut();
 
-        egui::Window::new("Tools").show(ctx, |ui| {
+        egui::Window::new(get!("tools.title")).show(ctx, |ui| {
            egui::Grid::new("tools").show(ui, |ui| {
                for item in Tools::iter() {
                    if tool_state.current == item {
                        ui.scope(|ui| {
                            ui.disable();
-                           let _ = ui.button(item.to_string());
+                           let _ = ui.button(item.name());
                        });
                    } else {
-                       if ui.button(item.to_string()).clicked() {
+                       if ui.button(item.name()).clicked() {
                            tool_state.current = item;
                        }
                    }

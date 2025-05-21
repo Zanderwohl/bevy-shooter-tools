@@ -6,6 +6,7 @@ use bevy::render::camera::Viewport;
 use bevy::window::{PrimaryWindow, WindowResized};
 use bevy_egui::{egui, EguiContextPass, EguiContexts};
 use bevy_vector_shapes::prelude::*;
+use crate::get;
 
 pub struct MulticamPlugin {
     pub test_scene: bool,
@@ -75,18 +76,19 @@ impl MulticamPlugin {
         });
 
         let cameras = [
-            ("Free Camera", Transform::from_xyz(-2.5, 4.5, 9.0).looking_at(Vec3::ZERO, Vec3::Y), &perspective),
-            ("Front", Transform::from_xyz(5.0, 0.0, 0.0).looking_at(Vec3::ZERO, Vec3::Y), &orthographic),
-            ("Top", Transform::from_xyz(0.0, 5.0, 0.0).looking_at(Vec3::ZERO, -Vec3::X), &orthographic),
-            ("Right", Transform::from_xyz(0.0, 0.0, 5.0).looking_at(Vec3::ZERO, Vec3::Y), &orthographic),
+            (get!("viewport.free"), Transform::from_xyz(-2.5, 4.5, 9.0).looking_at(Vec3::ZERO, Vec3::Y), &perspective),
+            (get!("viewport.front"), Transform::from_xyz(5.0, 0.0, 0.0).looking_at(Vec3::ZERO, Vec3::Y), &orthographic),
+            (get!("viewport.top"), Transform::from_xyz(0.0, 5.0, 0.0).looking_at(Vec3::ZERO, -Vec3::X), &orthographic),
+            (get!("viewport.right"), Transform::from_xyz(0.0, 0.0, 5.0).looking_at(Vec3::ZERO, Vec3::Y), &orthographic),
         ];
+        let cameras_len = cameras.len();
         for (idx, (camera_name, camera_pos, projection)) in cameras.into_iter().enumerate() {
             let camera = commands
                 .spawn((
                     Camera3d::default(),
                     Camera {
                         hdr: true,
-                        order: (cameras.len() - idx) as isize,
+                        order: (cameras_len - idx) as isize,
                         ..Default::default()
                     },
                     camera_pos,
@@ -209,20 +211,20 @@ impl MulticamPlugin {
     ) {
         let ctx = contexts.ctx_mut();
 
-        egui::Window::new("Multicam Viewport").show(ctx, |ui| {
-            ui.heading("Viewport Controls");
+        egui::Window::new(get!("debug.viewport.title")).show(ctx, |ui| {
+            ui.heading(get!("debug.viewport.controls"));
             
             // Start coordinates
             ui.heading("X");
             ui.horizontal(|ui| {
-                ui.label("Start");
+                ui.label(get!("debug.viewport.start"));
                 let mut start_x = state.start.x;
                 if ui.add(egui::Slider::new(&mut start_x, 0.0..=state.end.x - 0.01)).changed() {
                     state.start.x = start_x;
                 }
             });
             ui.horizontal(|ui| {
-                ui.label("End");
+                ui.label(get!("debug.viewport.end"));
                 let mut end_x = state.end.x;
                 if ui.add(egui::Slider::new(&mut end_x, (state.start.x + 0.01)..=1.0)).changed() {
                     state.end.x = end_x;
@@ -234,14 +236,14 @@ impl MulticamPlugin {
             // End coordinates
             ui.heading("Y");
             ui.horizontal(|ui| {
-                ui.label("Start");
+                ui.label(get!("debug.viewport.start"));
                 let mut start_y = state.start.y;
                 if ui.add(egui::Slider::new(&mut start_y, 0.0..=state.end.y - 0.01)).changed() {
                     state.start.y = start_y;
                 }
             });
             ui.horizontal(|ui| {
-                ui.label("End");
+                ui.label(get!("debug.viewport.end"));
                 let mut end_y = state.end.y;
                 if ui.add(egui::Slider::new(&mut end_y, (state.start.y + 0.01)..=1.0)).changed() {
                     state.end.y = end_y;

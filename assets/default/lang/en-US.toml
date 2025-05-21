@@ -1,2 +1,19 @@
 [editor]
 title = "Bevy Shooter Tools Level Editor"
+
+[viewport]
+free = "Freecam"
+front = "Front"
+top = "Top"
+right = "Right"
+
+[debug.viewport]
+title = "Multicam Viewport"
+controls = "Squish Controls"
+start = "Start"
+end = "End"
+
+[tools]
+title = "Tools"
+select = "Select"
+move = "Move"
