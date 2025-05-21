@@ -1,5 +1,6 @@
 use bevy::core_pipeline::bloom::Bloom;
 use bevy::core_pipeline::tonemapping::Tonemapping;
+use bevy::input::mouse::MouseMotion;
 use bevy::prelude::*;
 use bevy::render::camera::Viewport;
 use bevy::window::{PrimaryWindow, WindowResized};
@@ -212,35 +213,35 @@ impl MulticamPlugin {
             ui.heading("Viewport Controls");
             
             // Start coordinates
-            ui.heading("Start Position");
+            ui.heading("X");
             ui.horizontal(|ui| {
-                ui.label("X:");
+                ui.label("Start");
                 let mut start_x = state.start.x;
                 if ui.add(egui::Slider::new(&mut start_x, 0.0..=state.end.x - 0.01)).changed() {
                     state.start.x = start_x;
                 }
             });
             ui.horizontal(|ui| {
-                ui.label("Y:");
-                let mut start_y = state.start.y;
-                if ui.add(egui::Slider::new(&mut start_y, 0.0..=state.end.y - 0.01)).changed() {
-                    state.start.y = start_y;
+                ui.label("End");
+                let mut end_x = state.end.x;
+                if ui.add(egui::Slider::new(&mut end_x, (state.start.x + 0.01)..=1.0)).changed() {
+                    state.end.x = end_x;
                 }
             });
 
             ui.separator();
 
             // End coordinates
-            ui.heading("End Position");
+            ui.heading("Y");
             ui.horizontal(|ui| {
-                ui.label("X:");
-                let mut end_x = state.end.x;
-                if ui.add(egui::Slider::new(&mut end_x, (state.start.x + 0.01)..=1.0)).changed() {
-                    state.end.x = end_x;
+                ui.label("Start");
+                let mut start_y = state.start.y;
+                if ui.add(egui::Slider::new(&mut start_y, 0.0..=state.end.y - 0.01)).changed() {
+                    state.start.y = start_y;
                 }
             });
             ui.horizontal(|ui| {
-                ui.label("Y:");
+                ui.label("End");
                 let mut end_y = state.end.y;
                 if ui.add(egui::Slider::new(&mut end_y, (state.start.y + 0.01)..=1.0)).changed() {
                     state.end.y = end_y;
@@ -250,14 +251,75 @@ impl MulticamPlugin {
     }
 
     fn handle_input(
-        mut state: ResMut<MulticamState>,
+        _state: ResMut<MulticamState>,
         mouse_buttons: Res<ButtonInput<MouseButton>>,
         windows: Query<&Window, With<PrimaryWindow>>,
-        cameras: Query<(&Camera, &GlobalTransform, &Multicam)>,
+        cameras_q: Query<(&Camera, &GlobalTransform, &Multicam)>,
         mut painter: ShapePainter,
+        mut _evr_motion: EventReader<MouseMotion>,
     ) {
         let window = windows.single().unwrap();
 
-        let mouse = window.cursor_position();
+        let left_pressed = mouse_buttons.pressed(MouseButton::Left);
+        let right_pressed = mouse_buttons.pressed(MouseButton::Right);
+
+        let mut button_to_draw_for: Option<MouseButton> = None;
+
+        if left_pressed && right_pressed {
+            // If both were just pressed, discard for this interaction
+        } else if left_pressed {
+            button_to_draw_for = Some(MouseButton::Left);
+        } else if right_pressed {
+            button_to_draw_for = Some(MouseButton::Right);
+        }
+
+        if let Some(determined_button) = button_to_draw_for {
+            // Check if this determined button is currently pressed
+            if mouse_buttons.pressed(determined_button) {
+                if let Some(cursor_pos_window) = window.cursor_position() {
+                    // Convert cursor position from window (top-left, logical) to viewport (bottom-left, physical)
+                    let physical_cursor_x = cursor_pos_window.x * window.scale_factor() as f32;
+                    let physical_cursor_y = (cursor_pos_window.y * window.scale_factor() as f32);
+
+                    for (camera, _camera_transform, _multicam_component) in cameras_q.iter() {
+                        if let Some(viewport) = &camera.viewport {
+                            let vp_min = viewport.physical_position.as_vec2();
+                            let vp_max = vp_min + viewport.physical_size.as_vec2();
+
+                            // Check if cursor is within this viewport's bounds
+                            if physical_cursor_x >= vp_min.x && physical_cursor_x < vp_max.x &&
+                               physical_cursor_y >= vp_min.y && physical_cursor_y < vp_max.y
+                            {
+                                let color = match determined_button {
+                                    MouseButton::Left => Color::WHITE,
+                                    MouseButton::Right => Color::srgb_u8(255, 0, 0),
+                                    _ => continue, // Should not be reached due to earlier logic
+                                };
+
+                                info!("Drawing for {}", _multicam_component.name);
+
+                                painter.reset(); // Reset painter properties for this specific drawing
+                                painter.color = color;
+                                painter.thickness = 3.0; // Define border thickness
+
+                                // Get viewport physical coordinates for drawing
+                                let min_x = viewport.physical_position.x as f32;
+                                let min_y = viewport.physical_position.y as f32;
+                                let max_x = min_x + viewport.physical_size.x as f32;
+                                let max_y = min_y + viewport.physical_size.y as f32;
+
+                                // Draw the rectangle border
+                                painter.line(Vec3::new(min_x, min_y, 0.0), Vec3::new(max_x, min_y, 0.0)); // Bottom
+                                painter.line(Vec3::new(min_x, max_y, 0.0), Vec3::new(max_x, max_y, 0.0)); // Top
+                                painter.line(Vec3::new(min_x, min_y, 0.0), Vec3::new(min_x, max_y, 0.0)); // Left
+                                painter.line(Vec3::new(max_x, min_y, 0.0), Vec3::new(max_x, max_y, 0.0)); // Right
+                                
+                                break; // Border drawn for the first viewport found under cursor
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
