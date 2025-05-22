@@ -1,8 +1,10 @@
 use bevy::core_pipeline::bloom::Bloom;
 use bevy::core_pipeline::tonemapping::Tonemapping;
 use bevy::input::mouse::MouseMotion;
+use bevy::log::tracing_subscriber::fmt::writer::MakeWriterExt;
 use bevy::prelude::*;
 use bevy::render::camera::Viewport;
+use bevy::picking::backend::ray::RayMap;
 use bevy::window::{PrimaryWindow, WindowResized};
 use bevy_egui::{egui, EguiContextPass, EguiContexts};
 use bevy_vector_shapes::prelude::*;
@@ -17,6 +19,7 @@ pub struct MulticamState {
     pub test_scene: bool,
     pub start: Vec2,
     pub end: Vec2,
+    pub debug_window: bool,
     pub debug_viewport_box: bool,
     pub debug_mouse_circle: bool,
 }
@@ -31,14 +34,18 @@ pub struct Multicam {
 #[derive(Component)]
 pub struct MulticamTestScene;
 
+#[derive(Component)]
+pub struct EditorSelectable;
+
 impl Default for MulticamState {
     fn default() -> Self {
         Self {
             test_scene: false,
-            start: Vec2::ZERO,
-            end: Vec2::ONE, // This MUST be more than start or else the first frame will crash.
+            start: Vec2::new(0.1, 0.1),
+            end: Vec2::new(0.9, 0.9), // This MUST be more than start or else the first frame will crash.
             debug_viewport_box: false,
             debug_mouse_circle: false,
+            debug_window: false,
         }
     }
 }
@@ -153,6 +160,7 @@ impl MulticamPlugin {
                 MeshMaterial3d(materials.add(Color::WHITE)),
                 Transform::from_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2)),
                 MulticamTestScene,
+                EditorSelectable,
             ));
             // cube
             commands.spawn((
@@ -160,6 +168,7 @@ impl MulticamPlugin {
                 MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
                 Transform::from_xyz(0.0, 0.5, 0.0),
                 MulticamTestScene,
+                EditorSelectable,
             ));
             // light
             commands.spawn((
@@ -230,6 +239,10 @@ impl MulticamPlugin {
         mut contexts: EguiContexts,
     ) {
         let ctx = contexts.ctx_mut();
+        
+        if !state.debug_window {
+            return;
+        }
 
         egui::Window::new(get!("debug.viewport.title")).show(ctx, |ui| {
             ui.heading(get!("debug.viewport.controls"));
@@ -285,21 +298,30 @@ impl MulticamPlugin {
         ui_cam: Query<(&Camera, &Camera2d), Without<Multicam>>,
         mut painter: ShapePainter,
         mut _evr_motion: EventReader<MouseMotion>,
+        mut egui_contexts: EguiContexts,
+        ray_map: Res<RayMap>,
+        mut ray_cast: MeshRayCast,
+        selectables: Query<(), With<EditorSelectable>>
     ) {
+        let ctx = egui_contexts.ctx_mut();
+        if ctx.is_pointer_over_area() || ctx.wants_pointer_input() {
+            return;
+        }
+
         let window = windows.single().unwrap();
         let (ui_cam, _) = ui_cam.single().unwrap();
 
         let left_pressed = mouse_buttons.pressed(MouseButton::Left);
         let right_pressed = mouse_buttons.pressed(MouseButton::Right);
 
-        let mut button_to_draw_for: Option<MouseButton> = None;
+        let mut button: Option<MouseButton> = None;
 
         if left_pressed && right_pressed {
             // If both were just pressed, discard for this interaction
         } else if left_pressed {
-            button_to_draw_for = Some(MouseButton::Left);
+            button = Some(MouseButton::Left);
         } else if right_pressed {
-            button_to_draw_for = Some(MouseButton::Right);
+            button = Some(MouseButton::Right);
         }
 
         
@@ -318,48 +340,74 @@ impl MulticamPlugin {
                 painter.circle(10.0);
             }
         }
-        
-        if let Some(determined_button) = button_to_draw_for {
-            // Check if this determined button is currently pressed
-            if mouse_buttons.pressed(determined_button) {
-                if let Some(cursor_pos_window) = window.cursor_position() {
-                    // Convert cursor position from window (top-left, logical) to viewport (bottom-left, physical)
+
+        for (id, ray) in ray_map.iter() {
+            let filter = |entity| selectables.contains(entity);
+            
+            if let Some((_, hit)) = ray_cast
+                .cast_ray(*ray, &MeshRayCastSettings::default().with_filter(&filter))
+                .first()
+            {
+                info!("{:?} {:?}", id, hit);
+            }
+        }
+
+        if let Some(cursor_pos_window) = window.cursor_position() {
+            for (camera, camera_transform, _multicam_component) in cameras_q.iter() {
+                if let Some(viewport) = &camera.viewport {
+                    let vp_min = viewport.physical_position.as_vec2();
+                    let vp_max = vp_min + viewport.physical_size.as_vec2();
+
                     let physical_cursor_x = cursor_pos_window.x * window.scale_factor();
                     let physical_cursor_y = cursor_pos_window.y * window.scale_factor();
 
-                    for (camera, _camera_transform, _multicam_component) in cameras_q.iter() {
-                        if let Some(viewport) = &camera.viewport {
-                            let vp_min = viewport.physical_position.as_vec2();
-                            let vp_max = vp_min + viewport.physical_size.as_vec2();
-
-                            // Check if cursor is within this viewport's bounds
-                            if physical_cursor_x >= vp_min.x && physical_cursor_x < vp_max.x &&
-                               physical_cursor_y >= vp_min.y && physical_cursor_y < vp_max.y
-                            {
-                                let color = match determined_button {
-                                    MouseButton::Left => Color::WHITE,
-                                    MouseButton::Right => Color::srgb_u8(255, 0, 0),
-                                    _ => continue, // Should not be reached due to earlier logic
-                                };
+                    // Check if cursor is within this viewport's bounds
+                    if physical_cursor_x >= vp_min.x && physical_cursor_x < vp_max.x &&
+                        physical_cursor_y >= vp_min.y && physical_cursor_y < vp_max.y
+                    {
+                        if let Some(button) = button {
+                            if mouse_buttons.pressed(button) {
+                                Self::draw_indicator_box(&mut painter, &ui_cam, viewport, button);
                                 
-                                painter.reset(); // Reset painter properties for this specific drawing
-                                painter.color = color;
-                                painter.thickness = 3.0; // Define border thickness
-
-                                let min = viewport.physical_position.as_vec2();
-                                let max = min + viewport.physical_size.as_vec2();
-                                let min = window_to_painter(&ui_cam, min);
-                                let max = window_to_painter(&ui_cam, max);
                                 
-                                draw_rect(&mut painter, min, max);
-                                
-                                break; // Border drawn for the first viewport found under cursor
                             }
+                        } else {
+                            painter.reset(); // Reset painter properties for this specific drawing
+                            painter.color = Color::srgb_u8(200, 200, 200);
+                            painter.thickness = 1.0; // Define border thickness
+
+                            let min = viewport.physical_position.as_vec2();
+                            let max = min + viewport.physical_size.as_vec2();
+                            let min = window_to_painter(&ui_cam, min);
+                            let max = window_to_painter(&ui_cam, max);
+
+                            draw_rect(&mut painter, min, max);
                         }
+
+                        break; // Border drawn for the first viewport found under cursor
                     }
                 }
             }
         }
+    }
+
+    fn draw_indicator_box(mut painter: &mut ShapePainter, ui_cam: &&Camera, viewport: &Viewport, button: MouseButton) {
+        let color = match button {
+            MouseButton::Left => Color::WHITE,
+            MouseButton::Right => Color::hsv(0.0, 0.4, 1.0),
+            _ => Color::srgb_u8(0, 255, 0), // Should not be reached due to earlier logic
+        };
+
+        painter.reset(); // Reset painter properties for this specific drawing
+        painter.color = color;
+        painter.thickness = 2.0; // Define border thickness
+
+        let min = viewport.physical_position.as_vec2();
+        let max = min + viewport.physical_size.as_vec2();
+        let min = window_to_painter(&ui_cam, min);
+        let max = window_to_painter(&ui_cam, max);
+
+        draw_rect(&mut painter, min, max);
     }
 }
 
