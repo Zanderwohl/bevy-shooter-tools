@@ -5,6 +5,8 @@ use bevy::input::mouse::MouseMotion;
 use bevy::prelude::*;
 use bevy::render::camera::Viewport;
 use bevy::picking::backend::ray::RayMap;
+use bevy::picking::pointer::{PointerId, PointerLocation};
+use bevy::render::view::RenderLayers;
 use bevy::window::{PrimaryWindow, WindowResized};
 use bevy_egui::{egui, EguiContextPass, EguiContexts};
 use bevy_vector_shapes::prelude::*;
@@ -47,7 +49,7 @@ impl Default for MulticamState {
             end: Vec2::new(0.9, 0.9), // This MUST be more than start or else the first frame will crash.
             debug_viewport_box: false,
             debug_mouse_circle: false,
-            debug_window: true,
+            debug_window: false,
         }
     }
 }
@@ -104,6 +106,7 @@ impl MulticamPlugin {
                 order: (cameras_len + 1) as isize,
                 ..Default::default()
             },
+            RenderLayers::layer(31)
             /*Multicam {
                 name: get!("viewport.ui"),
                 screen_pos: UVec2::new(0u32, 0u32),
@@ -306,9 +309,10 @@ impl MulticamPlugin {
         mut painter: ShapePainter,
         mut _evr_motion: EventReader<MouseMotion>,
         mut egui_contexts: EguiContexts,
-        ray_map: Res<RayMap>,
         mut ray_cast: MeshRayCast,
         selectables: Query<&EditorSelectable>,
+        pointers: Query<(&PointerId, &PointerLocation)>,
+        primary_window_entity: Query<Entity, With<PrimaryWindow>>,
         mut gizmos: Gizmos,
     ) {
         let ctx = egui_contexts.ctx_mut();
@@ -317,7 +321,7 @@ impl MulticamPlugin {
         }
 
         let window = windows.single().unwrap();
-        let (ui_cam, _) = ui_cam.single().unwrap();
+        let ui_cam = ui_cam.single();
 
         let left_pressed = mouse_buttons.pressed(MouseButton::Left);
         let right_pressed = mouse_buttons.pressed(MouseButton::Right);
@@ -332,20 +336,23 @@ impl MulticamPlugin {
             button = Some(MouseButton::Right);
         }
 
-        
-        if state.debug_viewport_box {
-            painter.reset();
-            let viewport_start = window_to_painter_frac(&ui_cam, state.start).extend(1.0);
-            let viewport_end = window_to_painter_frac(&ui_cam, state.end).extend(1.0);
-            painter.color = Color::srgb_u8(0, 0, 255);
-            draw_rect(&mut painter, viewport_start.truncate(), viewport_end.truncate());
-        }
-
-        if state.debug_mouse_circle {
-            if let Some(cursor_window_pos) = window.cursor_position() {
+        if let Ok((ui_cam, _)) = ui_cam {
+            if state.debug_viewport_box {
                 painter.reset();
-                painter.set_translation(window_to_painter(&ui_cam, cursor_window_pos).extend(1.0));
-                painter.circle(10.0);
+                painter.render_layers = Some(RenderLayers::layer(31));
+                let viewport_start = window_to_painter_frac(&ui_cam, state.start).extend(1.0);
+                let viewport_end = window_to_painter_frac(&ui_cam, state.end).extend(1.0);
+                painter.color = Color::srgb_u8(0, 0, 255);
+                draw_rect(&mut painter, viewport_start.truncate(), viewport_end.truncate());
+            }
+
+            if state.debug_mouse_circle {
+                if let Some(cursor_window_pos) = window.cursor_position() {
+                    painter.reset();
+                    painter.render_layers = Some(RenderLayers::layer(31));
+                    painter.set_translation(window_to_painter(&ui_cam, cursor_window_pos).extend(1.0));
+                    painter.circle(10.0);
+                }
             }
         }
 
@@ -353,54 +360,53 @@ impl MulticamPlugin {
         let settings = MeshRayCastSettings::default().with_filter(&filter);
 
         if let Some(cursor_pos_window) = window.cursor_position() {
-            for (id, camera, camera_transform, camera_multicam) in cameras_q.iter() {
-                for (ray_id, ray) in ray_map.iter() {
-                    if id == ray_id.camera {
+            for (camera_entity, camera, camera_tfm, camera_multicam) in &cameras_q {
+                for (&pointer_id, pointer_loc) in &pointers {
+                    if let Some(ray) = make_ray(&primary_window_entity, camera, camera_tfm, pointer_loc) {
                         if let Some((hit_entity, hit_data)) = ray_cast
-                            .cast_ray(*ray, &settings)
+                            .cast_ray(ray, &settings)
                             .first() {
                             if let Ok(selectable) = selectables.get(*hit_entity) {
-                                // draw the ray in 3d
                                 gizmos.line(ray.origin, hit_data.point, Color::srgb_u8(255, 0, 0));
-
-                                info!("In Camera {} Selectable {:?}", camera_multicam.name, selectable.id);
                             }
+                        } else {
+                            gizmos.line(ray.origin, ray.origin + ray.direction * 100.0, Color::srgb_u8(0, 255, 0));
                         }
                     }
                 }
 
-                
-                if let Some(viewport) = &camera.viewport {
-                    let vp_min = viewport.physical_position.as_vec2();
-                    let vp_max = vp_min + viewport.physical_size.as_vec2();
+                if let Ok((ui_cam, _)) = ui_cam {
+                    if let Some(viewport) = &camera.viewport {
+                        let vp_min = viewport.physical_position.as_vec2();
+                        let vp_max = vp_min + viewport.physical_size.as_vec2();
 
-                    let physical_cursor_x = cursor_pos_window.x * window.scale_factor();
-                    let physical_cursor_y = cursor_pos_window.y * window.scale_factor();
+                        let physical_cursor_x = cursor_pos_window.x * window.scale_factor();
+                        let physical_cursor_y = cursor_pos_window.y * window.scale_factor();
 
-                    // Check if cursor is within this viewport's bounds
-                    if physical_cursor_x >= vp_min.x && physical_cursor_x < vp_max.x &&
-                        physical_cursor_y >= vp_min.y && physical_cursor_y < vp_max.y
-                    {
-                        if let Some(button) = button {
-                            if mouse_buttons.pressed(button) {
-                                Self::draw_indicator_box(&mut painter, &ui_cam, viewport, button);
-                                
-                                
+                        // Check if cursor is within this viewport's bounds
+                        if physical_cursor_x >= vp_min.x && physical_cursor_x < vp_max.x &&
+                            physical_cursor_y >= vp_min.y && physical_cursor_y < vp_max.y
+                        {
+                            if let Some(button) = button {
+                                if mouse_buttons.pressed(button) {
+                                    Self::draw_indicator_box(&mut painter, &ui_cam, viewport, button);
+                                }
+                            } else {
+                                painter.reset(); // Reset painter properties for this specific drawing
+                                painter.render_layers = Some(RenderLayers::layer(31));
+                                painter.color = Color::srgb_u8(200, 200, 200);
+                                painter.thickness = 1.0; // Define border thickness
+
+                                let min = viewport.physical_position.as_vec2();
+                                let max = min + viewport.physical_size.as_vec2();
+                                let min = window_to_painter(&ui_cam, min);
+                                let max = window_to_painter(&ui_cam, max);
+
+                                draw_rect(&mut painter, min, max);
                             }
-                        } else {
-                            painter.reset(); // Reset painter properties for this specific drawing
-                            painter.color = Color::srgb_u8(200, 200, 200);
-                            painter.thickness = 1.0; // Define border thickness
 
-                            let min = viewport.physical_position.as_vec2();
-                            let max = min + viewport.physical_size.as_vec2();
-                            let min = window_to_painter(&ui_cam, min);
-                            let max = window_to_painter(&ui_cam, max);
-
-                            draw_rect(&mut painter, min, max);
+                            break; // Border drawn for the first viewport found under cursor
                         }
-
-                        break; // Border drawn for the first viewport found under cursor
                     }
                 }
             }
@@ -415,6 +421,7 @@ impl MulticamPlugin {
         };
 
         painter.reset(); // Reset painter properties for this specific drawing
+        painter.render_layers = Some(RenderLayers::layer(31));
         painter.color = color;
         painter.thickness = 2.0; // Define border thickness
 
@@ -464,4 +471,17 @@ fn window_to_painter_frac(cam: &Camera, frac: Vec2) -> Vec2 {
         (cam_viewport.max.x - cam_viewport.min.x) as f32 * (frac.x - 0.5),
         (cam_viewport.max.y - cam_viewport.min.y) as f32 * (1.0 - (frac.y + 0.5))
     )
+}
+
+fn make_ray(
+    primary_window_entity: &Query<Entity, With<PrimaryWindow>>,
+    camera: &Camera,
+    camera_tfm: &GlobalTransform,
+    pointer_loc: &PointerLocation,
+) -> Option<Ray3d> {
+    let pointer_loc = pointer_loc.location()?;
+    if !pointer_loc.is_in_viewport(camera, primary_window_entity) {
+        return None;
+    }
+    camera.viewport_to_world(camera_tfm, pointer_loc.position).ok()
 }
