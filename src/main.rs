@@ -42,7 +42,7 @@ fn main() {
         )
         .add_plugins((
             EguiPlugin { enable_multipass_for_primary_context: true },
-            ShapePlugin::default(),
+            Shape2dPlugin::default(),
         ))
         .add_plugins((
             MulticamPlugin {

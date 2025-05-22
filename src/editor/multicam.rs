@@ -82,6 +82,22 @@ impl MulticamPlugin {
             (get!("viewport.right"), Transform::from_xyz(0.0, 0.0, 5.0).looking_at(Vec3::ZERO, Vec3::Y), &orthographic),
         ];
         let cameras_len = cameras.len();
+
+        commands.spawn((
+            Camera2d::default(),
+            GlobalTransform::default(),
+            Camera {
+                hdr: true,
+                order: (cameras_len + 1) as isize,
+                ..Default::default()
+            },
+            /*Multicam {
+                name: get!("viewport.ui"),
+                screen_pos: UVec2::new(0u32, 0u32),
+                id: cameras_len as u32 + 1,
+            },*/
+        ));
+
         for (idx, (camera_name, camera_pos, projection)) in cameras.into_iter().enumerate() {
             let camera = commands
                 .spawn((
@@ -169,7 +185,7 @@ impl MulticamPlugin {
         }
     }
 
-    fn calculate_resize(mut cameras: &mut Query<(&mut Camera, &Multicam)>, state: &Res<MulticamState>, window: &Window) {
+    fn calculate_resize(cameras: &mut Query<(&mut Camera, &Multicam)>, state: &Res<MulticamState>, window: &Window) {
         let window_size = window.physical_size();
 
         // Calculate the viewport size based on start and end coordinates
@@ -253,14 +269,16 @@ impl MulticamPlugin {
     }
 
     fn handle_input(
-        _state: ResMut<MulticamState>,
+        state: ResMut<MulticamState>,
         mouse_buttons: Res<ButtonInput<MouseButton>>,
         windows: Query<&Window, With<PrimaryWindow>>,
         cameras_q: Query<(&Camera, &GlobalTransform, &Multicam)>,
+        ui_cam: Query<(&Camera, &Camera2d), Without<Multicam>>,
         mut painter: ShapePainter,
         mut _evr_motion: EventReader<MouseMotion>,
     ) {
         let window = windows.single().unwrap();
+        let (ui_cam, _) = ui_cam.single().unwrap();
 
         let left_pressed = mouse_buttons.pressed(MouseButton::Left);
         let right_pressed = mouse_buttons.pressed(MouseButton::Right);
@@ -275,6 +293,32 @@ impl MulticamPlugin {
             button_to_draw_for = Some(MouseButton::Right);
         }
 
+        let window_size = window.physical_size();
+        let ui_cam_area = ui_cam.physical_viewport_rect().unwrap();
+        let viewport_size = Vec3::new(
+            (ui_cam_area.max.x - ui_cam_area.min.x) as f32 * (state.end.x - state.start.x),
+            (ui_cam_area.max.y - ui_cam_area.min.y) as f32 * (state.end.y - state.start.y),
+            1.0
+        );
+        let viewport_size_y_inverted = Vec3::new(viewport_size.x, -viewport_size.y, viewport_size.z);
+
+        // Calculate the starting position of the viewport
+        let viewport_start = Vec3::new(
+            (ui_cam_area.max.x - ui_cam_area.min.x) as f32 * (state.start.x - 0.5),
+            (ui_cam_area.max.y - ui_cam_area.min.y) as f32 * (1.0 - (state.start.y + 0.5)),
+            1.0
+        );
+        
+        painter.color = Color::srgb_u8(0, 0, 255);
+        
+        painter.reset();
+        painter.set_translation(viewport_start);
+        painter.circle(5.0);
+        
+        painter.reset();
+        painter.hollow = true;
+        draw_rect(&mut painter, viewport_start.truncate(), viewport_start.truncate() + viewport_size_y_inverted.truncate());
+
         if let Some(determined_button) = button_to_draw_for {
             // Check if this determined button is currently pressed
             if mouse_buttons.pressed(determined_button) {
@@ -287,6 +331,7 @@ impl MulticamPlugin {
                         if let Some(viewport) = &camera.viewport {
                             let vp_min = viewport.physical_position.as_vec2();
                             let vp_max = vp_min + viewport.physical_size.as_vec2();
+                            let vp_height = viewport.physical_size.as_vec2().y;
 
                             // Check if cursor is within this viewport's bounds
                             if physical_cursor_x >= vp_min.x && physical_cursor_x < vp_max.x &&
@@ -297,24 +342,12 @@ impl MulticamPlugin {
                                     MouseButton::Right => Color::srgb_u8(255, 0, 0),
                                     _ => continue, // Should not be reached due to earlier logic
                                 };
-
-                                info!("Drawing for {}", _multicam_component.name);
-
+                                
                                 painter.reset(); // Reset painter properties for this specific drawing
                                 painter.color = color;
                                 painter.thickness = 3.0; // Define border thickness
 
-                                // Get viewport physical coordinates for drawing
-                                let min_x = viewport.physical_position.x as f32;
-                                let min_y = viewport.physical_position.y as f32;
-                                let max_x = min_x + viewport.physical_size.x as f32;
-                                let max_y = min_y + viewport.physical_size.y as f32;
-
-                                // Draw the rectangle border
-                                painter.line(Vec3::new(min_x, min_y, 0.0), Vec3::new(max_x, min_y, 0.0)); // Bottom
-                                painter.line(Vec3::new(min_x, max_y, 0.0), Vec3::new(max_x, max_y, 0.0)); // Top
-                                painter.line(Vec3::new(min_x, min_y, 0.0), Vec3::new(min_x, max_y, 0.0)); // Left
-                                painter.line(Vec3::new(max_x, min_y, 0.0), Vec3::new(max_x, max_y, 0.0)); // Right
+                                
                                 
                                 break; // Border drawn for the first viewport found under cursor
                             }
@@ -324,4 +357,15 @@ impl MulticamPlugin {
             }
         }
     }
+}
+
+fn draw_rect(
+    painter: &mut ShapePainter,
+    min: Vec2,
+    max: Vec2,
+) {
+    painter.line(Vec3::new(min.x, min.y, 0.0), Vec3::new(max.x, min.y, 0.0)); // Bottom
+    painter.line(Vec3::new(min.x, max.y, 0.0), Vec3::new(max.x, max.y, 0.0)); // Top
+    painter.line(Vec3::new(min.x, min.y, 0.0), Vec3::new(min.x, max.y, 0.0)); // Left
+    painter.line(Vec3::new(max.x, min.y, 0.0), Vec3::new(max.x, max.y, 0.0)); // Right
 }

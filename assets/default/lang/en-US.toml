@@ -6,6 +6,7 @@ free = "Freecam"
 front = "Front"
 top = "Top"
 right = "Right"
+ui = "UI Camera"
 
 [debug.viewport]
 title = "Multicam Viewport"
