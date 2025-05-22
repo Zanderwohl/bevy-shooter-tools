@@ -14,6 +14,11 @@ controls = "Squish Controls"
 start = "Start"
 end = "End"
 
+[debug.viewport.draw]
+title = "Draw Debug Indicators"
+mouse = "Mouse Circle"
+box = "Viewport Box"
+
 [tools]
 title = "Tools"
 select = "Select"

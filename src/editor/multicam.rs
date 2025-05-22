@@ -17,6 +17,8 @@ pub struct MulticamState {
     pub test_scene: bool,
     pub start: Vec2,
     pub end: Vec2,
+    pub debug_viewport_box: bool,
+    pub debug_mouse_circle: bool,
 }
 
 #[derive(Component)]
@@ -35,6 +37,8 @@ impl Default for MulticamState {
             test_scene: false,
             start: Vec2::ZERO,
             end: Vec2::ONE, // This MUST be more than start or else the first frame will crash.
+            debug_viewport_box: false,
+            debug_mouse_circle: false,
         }
     }
 }
@@ -265,6 +269,11 @@ impl MulticamPlugin {
                     state.end.y = end_y;
                 }
             });
+            
+            ui.separator();
+            ui.heading(get!("debug.viewport.draw.title"));
+            ui.checkbox(&mut state.debug_mouse_circle, get!("debug.viewport.draw.mouse"));
+            ui.checkbox(&mut state.debug_viewport_box, get!("debug.viewport.draw.box"));
         });
     }
 
@@ -293,32 +302,23 @@ impl MulticamPlugin {
             button_to_draw_for = Some(MouseButton::Right);
         }
 
-        let window_size = window.physical_size();
-        let ui_cam_area = ui_cam.physical_viewport_rect().unwrap();
-        let viewport_size = Vec3::new(
-            (ui_cam_area.max.x - ui_cam_area.min.x) as f32 * (state.end.x - state.start.x),
-            (ui_cam_area.max.y - ui_cam_area.min.y) as f32 * (state.end.y - state.start.y),
-            1.0
-        );
-        let viewport_size_y_inverted = Vec3::new(viewport_size.x, -viewport_size.y, viewport_size.z);
+        
+        if state.debug_viewport_box {
+            painter.reset();
+            let viewport_start = window_to_painter_frac(&ui_cam, state.start, &state).extend(1.0);
+            let viewport_end = window_to_painter_frac(&ui_cam, state.end, &state).extend(1.0);
+            painter.color = Color::srgb_u8(0, 0, 255);
+            draw_rect(&mut painter, viewport_start.truncate(), viewport_end.truncate());
+        }
 
-        // Calculate the starting position of the viewport
-        let viewport_start = Vec3::new(
-            (ui_cam_area.max.x - ui_cam_area.min.x) as f32 * (state.start.x - 0.5),
-            (ui_cam_area.max.y - ui_cam_area.min.y) as f32 * (1.0 - (state.start.y + 0.5)),
-            1.0
-        );
+        if state.debug_mouse_circle {
+            if let Some(cursor_window_pos) = window.cursor_position() {
+                painter.reset();
+                painter.set_translation(window_to_painter(&ui_cam, cursor_window_pos, &state).extend(1.0));
+                painter.circle(10.0);
+            }
+        }
         
-        painter.color = Color::srgb_u8(0, 0, 255);
-        
-        painter.reset();
-        painter.set_translation(viewport_start);
-        painter.circle(5.0);
-        
-        painter.reset();
-        painter.hollow = true;
-        draw_rect(&mut painter, viewport_start.truncate(), viewport_start.truncate() + viewport_size_y_inverted.truncate());
-
         if let Some(determined_button) = button_to_draw_for {
             // Check if this determined button is currently pressed
             if mouse_buttons.pressed(determined_button) {
@@ -347,7 +347,12 @@ impl MulticamPlugin {
                                 painter.color = color;
                                 painter.thickness = 3.0; // Define border thickness
 
+                                let min = viewport.physical_position.as_vec2();
+                                let max = min + viewport.physical_size.as_vec2();
+                                let min = window_to_painter(&ui_cam, min, &state);
+                                let max = window_to_painter(&ui_cam, max, &state);
                                 
+                                draw_rect(&mut painter, min, max);
                                 
                                 break; // Border drawn for the first viewport found under cursor
                             }
@@ -368,4 +373,32 @@ fn draw_rect(
     painter.line(Vec3::new(min.x, max.y, 0.0), Vec3::new(max.x, max.y, 0.0)); // Top
     painter.line(Vec3::new(min.x, min.y, 0.0), Vec3::new(min.x, max.y, 0.0)); // Left
     painter.line(Vec3::new(max.x, min.y, 0.0), Vec3::new(max.x, max.y, 0.0)); // Right
+}
+
+fn window_to_painter(cam: &Camera, pos: Vec2, state: &MulticamState) -> Vec2 {
+    let cam_viewport = cam.physical_viewport_rect().unwrap();
+    let size_x = (cam_viewport.max.x - cam_viewport.min.x) as f32;
+    let size_y = (cam_viewport.max.y - cam_viewport.min.y) as f32;
+    Vec2::new(
+        (cam_viewport.max.x - cam_viewport.min.x) as f32 * (pos.x / size_x - 0.5),
+        (cam_viewport.max.y - cam_viewport.min.y) as f32 * (1.0 - (pos.y / size_y + 0.5))
+    )
+}
+
+fn window_to_painter_broken(cam: &Camera, pos: Vec2, state: &MulticamState) -> Vec2 {
+    let cam_viewport = cam.physical_viewport_rect().unwrap();
+    let size_x = (cam_viewport.max.x - cam_viewport.min.x) as f32 * (state.end.x - state.start.x);
+    let size_y = (cam_viewport.max.y - cam_viewport.min.y) as f32 * (state.end.y - state.start.y);
+    Vec2::new(
+        (cam_viewport.max.x - cam_viewport.min.x) as f32 * (pos.x / size_x - 0.5),
+        (cam_viewport.max.y - cam_viewport.min.y) as f32 * (1.0 - (pos.y / size_y + 0.5))
+    )
+}
+
+fn window_to_painter_frac(cam: &Camera, frac: Vec2, state: &MulticamState) -> Vec2 {
+    let cam_viewport = cam.physical_viewport_rect().unwrap();
+    Vec2::new(
+        (cam_viewport.max.x - cam_viewport.min.x) as f32 * (frac.x - 0.5),
+        (cam_viewport.max.y - cam_viewport.min.y) as f32 * (1.0 - (frac.y + 0.5))
+    )
 }
