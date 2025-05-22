@@ -5,9 +5,11 @@ use bevy::log::tracing_subscriber::fmt::writer::MakeWriterExt;
 use bevy::prelude::*;
 use bevy::render::camera::Viewport;
 use bevy::picking::backend::ray::RayMap;
+use bevy::tasks::futures_lite::StreamExt;
 use bevy::window::{PrimaryWindow, WindowResized};
 use bevy_egui::{egui, EguiContextPass, EguiContexts};
 use bevy_vector_shapes::prelude::*;
+use toml::value::Index;
 use crate::get;
 
 pub struct MulticamPlugin {
@@ -35,7 +37,9 @@ pub struct Multicam {
 pub struct MulticamTestScene;
 
 #[derive(Component)]
-pub struct EditorSelectable;
+pub struct EditorSelectable {
+    id: String,
+}
 
 impl Default for MulticamState {
     fn default() -> Self {
@@ -160,7 +164,7 @@ impl MulticamPlugin {
                 MeshMaterial3d(materials.add(Color::WHITE)),
                 Transform::from_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2)),
                 MulticamTestScene,
-                EditorSelectable,
+                EditorSelectable { id: "Base".to_owned() },
             ));
             // cube
             commands.spawn((
@@ -168,7 +172,7 @@ impl MulticamPlugin {
                 MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
                 Transform::from_xyz(0.0, 0.5, 0.0),
                 MulticamTestScene,
-                EditorSelectable,
+                EditorSelectable { id: "Cube".to_owned() },
             ));
             // light
             commands.spawn((
@@ -294,14 +298,15 @@ impl MulticamPlugin {
         state: ResMut<MulticamState>,
         mouse_buttons: Res<ButtonInput<MouseButton>>,
         windows: Query<&Window, With<PrimaryWindow>>,
-        cameras_q: Query<(&Camera, &GlobalTransform, &Multicam)>,
+        cameras_q: Query<(Entity, &Camera, &GlobalTransform, &Multicam)>,
         ui_cam: Query<(&Camera, &Camera2d), Without<Multicam>>,
         mut painter: ShapePainter,
         mut _evr_motion: EventReader<MouseMotion>,
         mut egui_contexts: EguiContexts,
         ray_map: Res<RayMap>,
         mut ray_cast: MeshRayCast,
-        selectables: Query<(), With<EditorSelectable>>
+        selectables: Query<&EditorSelectable>,
+        mut gizmos: Gizmos,
     ) {
         let ctx = egui_contexts.ctx_mut();
         if ctx.is_pointer_over_area() || ctx.wants_pointer_input() {
@@ -341,19 +346,27 @@ impl MulticamPlugin {
             }
         }
 
-        for (id, ray) in ray_map.iter() {
-            let filter = |entity| selectables.contains(entity);
-            
-            if let Some((_, hit)) = ray_cast
-                .cast_ray(*ray, &MeshRayCastSettings::default().with_filter(&filter))
-                .first()
-            {
-                info!("{:?} {:?}", id, hit);
-            }
-        }
+        let filter = |entity| selectables.get(entity).is_ok();
+        let settings = MeshRayCastSettings::default().with_filter(&filter);
 
         if let Some(cursor_pos_window) = window.cursor_position() {
-            for (camera, camera_transform, _multicam_component) in cameras_q.iter() {
+            for (id, camera, camera_transform, camera_multicam) in cameras_q.iter() {
+                for (ray_id, ray) in ray_map.iter() {
+                    if id == ray_id.camera {
+                        if let Some((hit_entity, hit_data)) = ray_cast
+                            .cast_ray(*ray, &settings)
+                            .first() {
+                            if let Ok(selectable) = selectables.get(*hit_entity) {
+                                // draw the ray in 3d
+                                gizmos.line(ray.origin, hit_data.point, Color::srgb_u8(255, 0, 0));
+
+                                info!("In Camera {} Selectable {:?}", camera_multicam.name, selectable.id);
+                            }
+                        }
+                    }
+                }
+
+                
                 if let Some(viewport) = &camera.viewport {
                     let vp_min = viewport.physical_position.as_vec2();
                     let vp_max = vp_min + viewport.physical_size.as_vec2();
