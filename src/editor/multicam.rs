@@ -1,15 +1,13 @@
 use bevy::core_pipeline::bloom::Bloom;
 use bevy::core_pipeline::tonemapping::Tonemapping;
+use bevy::diagnostic::FrameCount;
 use bevy::input::mouse::MouseMotion;
-use bevy::log::tracing_subscriber::fmt::writer::MakeWriterExt;
 use bevy::prelude::*;
 use bevy::render::camera::Viewport;
 use bevy::picking::backend::ray::RayMap;
-use bevy::tasks::futures_lite::StreamExt;
 use bevy::window::{PrimaryWindow, WindowResized};
 use bevy_egui::{egui, EguiContextPass, EguiContexts};
 use bevy_vector_shapes::prelude::*;
-use toml::value::Index;
 use crate::get;
 
 pub struct MulticamPlugin {
@@ -49,7 +47,7 @@ impl Default for MulticamState {
             end: Vec2::new(0.9, 0.9), // This MUST be more than start or else the first frame will crash.
             debug_viewport_box: false,
             debug_mouse_circle: false,
-            debug_window: false,
+            debug_window: true,
         }
     }
 }
@@ -191,6 +189,7 @@ impl MulticamPlugin {
         mut resize_events: EventReader<WindowResized>,
         mut cameras: Query<(&mut Camera, &Multicam)>,
         state: Res<MulticamState>,
+        frames: Res<FrameCount>,
     ) {
         for resize_event in resize_events.read() {
             let window = windows.get(resize_event.window).unwrap();
@@ -200,8 +199,12 @@ impl MulticamPlugin {
             let window = windows.single().unwrap();
             Self::calculate_resize(&mut cameras, &state, window);
         }
+        if frames.0 < 3 {
+            let window = windows.single().unwrap();
+            Self::calculate_resize(&mut cameras, &state, window);
+        }
     }
-
+    
     fn calculate_resize(cameras: &mut Query<(&mut Camera, &Multicam)>, state: &Res<MulticamState>, window: &Window) {
         let window_size = window.physical_size();
 
