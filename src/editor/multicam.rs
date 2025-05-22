@@ -305,8 +305,8 @@ impl MulticamPlugin {
         
         if state.debug_viewport_box {
             painter.reset();
-            let viewport_start = window_to_painter_frac(&ui_cam, state.start, &state).extend(1.0);
-            let viewport_end = window_to_painter_frac(&ui_cam, state.end, &state).extend(1.0);
+            let viewport_start = window_to_painter_frac(&ui_cam, state.start).extend(1.0);
+            let viewport_end = window_to_painter_frac(&ui_cam, state.end).extend(1.0);
             painter.color = Color::srgb_u8(0, 0, 255);
             draw_rect(&mut painter, viewport_start.truncate(), viewport_end.truncate());
         }
@@ -314,7 +314,7 @@ impl MulticamPlugin {
         if state.debug_mouse_circle {
             if let Some(cursor_window_pos) = window.cursor_position() {
                 painter.reset();
-                painter.set_translation(window_to_painter(&ui_cam, cursor_window_pos, &state).extend(1.0));
+                painter.set_translation(window_to_painter(&ui_cam, cursor_window_pos).extend(1.0));
                 painter.circle(10.0);
             }
         }
@@ -324,14 +324,13 @@ impl MulticamPlugin {
             if mouse_buttons.pressed(determined_button) {
                 if let Some(cursor_pos_window) = window.cursor_position() {
                     // Convert cursor position from window (top-left, logical) to viewport (bottom-left, physical)
-                    let physical_cursor_x = cursor_pos_window.x * window.scale_factor() as f32;
-                    let physical_cursor_y = (cursor_pos_window.y * window.scale_factor() as f32);
+                    let physical_cursor_x = cursor_pos_window.x * window.scale_factor();
+                    let physical_cursor_y = cursor_pos_window.y * window.scale_factor();
 
                     for (camera, _camera_transform, _multicam_component) in cameras_q.iter() {
                         if let Some(viewport) = &camera.viewport {
                             let vp_min = viewport.physical_position.as_vec2();
                             let vp_max = vp_min + viewport.physical_size.as_vec2();
-                            let vp_height = viewport.physical_size.as_vec2().y;
 
                             // Check if cursor is within this viewport's bounds
                             if physical_cursor_x >= vp_min.x && physical_cursor_x < vp_max.x &&
@@ -349,8 +348,8 @@ impl MulticamPlugin {
 
                                 let min = viewport.physical_position.as_vec2();
                                 let max = min + viewport.physical_size.as_vec2();
-                                let min = window_to_painter(&ui_cam, min, &state);
-                                let max = window_to_painter(&ui_cam, max, &state);
+                                let min = window_to_painter(&ui_cam, min);
+                                let max = window_to_painter(&ui_cam, max);
                                 
                                 draw_rect(&mut painter, min, max);
                                 
@@ -375,7 +374,7 @@ fn draw_rect(
     painter.line(Vec3::new(max.x, min.y, 0.0), Vec3::new(max.x, max.y, 0.0)); // Right
 }
 
-fn window_to_painter(cam: &Camera, pos: Vec2, state: &MulticamState) -> Vec2 {
+fn window_to_painter(cam: &Camera, pos: Vec2) -> Vec2 {
     let cam_viewport = cam.physical_viewport_rect().unwrap();
     let size_x = (cam_viewport.max.x - cam_viewport.min.x) as f32;
     let size_y = (cam_viewport.max.y - cam_viewport.min.y) as f32;
@@ -395,7 +394,7 @@ fn window_to_painter_broken(cam: &Camera, pos: Vec2, state: &MulticamState) -> V
     )
 }
 
-fn window_to_painter_frac(cam: &Camera, frac: Vec2, state: &MulticamState) -> Vec2 {
+fn window_to_painter_frac(cam: &Camera, frac: Vec2) -> Vec2 {
     let cam_viewport = cam.physical_viewport_rect().unwrap();
     Vec2::new(
         (cam_viewport.max.x - cam_viewport.min.x) as f32 * (frac.x - 0.5),

@@ -5,7 +5,7 @@ mod tool;
 
 use bevy::prelude::*;
 use bevy::window::{ExitCondition, PresentMode};
-use bevy_egui::{egui, EguiContexts, EguiPlugin, EguiContextPass};
+use bevy_egui::{EguiPlugin};
 use bevy_vector_shapes::prelude::*;
 use crate::common::lang::change_lang;
 use crate::common::perf::PerfPlugin;
