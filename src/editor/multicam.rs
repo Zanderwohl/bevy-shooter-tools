@@ -10,6 +10,7 @@ use bevy::render::view::RenderLayers;
 use bevy::window::{PrimaryWindow, WindowResized};
 use bevy_egui::{egui, EguiContextPass, EguiContexts};
 use bevy_vector_shapes::prelude::*;
+use crate::tool::selection::{EditorSelectable, SelectionEvent};
 use crate::get;
 
 pub struct MulticamPlugin {
@@ -36,11 +37,6 @@ pub struct Multicam {
 #[derive(Component)]
 pub struct MulticamTestScene;
 
-#[derive(Component)]
-pub struct EditorSelectable {
-    id: String,
-}
-
 impl Default for MulticamState {
     fn default() -> Self {
         Self {
@@ -65,6 +61,7 @@ impl Plugin for MulticamPlugin {
             .add_systems(Update, (
                 Self::set_camera_viewports,
                 Self::handle_input,
+                Self::draw_camera_gizmos,
             ))
             .add_systems(EguiContextPass, Self::debug_window)
         ;
@@ -82,6 +79,10 @@ impl MulticamPlugin {
             fov: 120.0,
             ..Default::default()
         });
+        let perspective2 = Projection::Perspective(PerspectiveProjection {
+            fov: 200.0,
+            ..Default::default()
+        });
         let orthographic = Projection::Orthographic(OrthographicProjection {
             near: 0.05,
             far: 1000.0,
@@ -90,11 +91,12 @@ impl MulticamPlugin {
             ..OrthographicProjection::default_2d()
         });
 
+        let dist = 5.0;
         let cameras = [
             (get!("viewport.free"), Transform::from_xyz(-2.5, 4.5, 9.0).looking_at(Vec3::ZERO, Vec3::Y), &perspective),
-            (get!("viewport.front"), Transform::from_xyz(5.0, 0.0, 0.0).looking_at(Vec3::ZERO, Vec3::Y), &orthographic),
-            (get!("viewport.top"), Transform::from_xyz(0.0, 5.0, 0.0).looking_at(Vec3::ZERO, -Vec3::X), &orthographic),
-            (get!("viewport.right"), Transform::from_xyz(0.0, 0.0, 5.0).looking_at(Vec3::ZERO, Vec3::Y), &orthographic),
+            (get!("viewport.front"), Transform::from_xyz(dist, 0.0, 0.0).looking_at(Vec3::ZERO, Vec3::Y), &orthographic),
+            (get!("viewport.top"), Transform::from_xyz(0.0, dist, 0.0).looking_at(Vec3::ZERO, -Vec3::X), &orthographic),
+            (get!("viewport.right"), Transform::from_xyz(0.0, 0.0, dist).looking_at(Vec3::ZERO, Vec3::Y), &orthographic),
         ];
         let cameras_len = cameras.len();
 
@@ -170,7 +172,10 @@ impl MulticamPlugin {
             MeshMaterial3d(materials.add(Color::WHITE)),
             Transform::from_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2)),
             MulticamTestScene,
-            EditorSelectable { id: "Base".to_owned() },
+            EditorSelectable {
+                id: "Base".to_owned(),
+                bounding_box: Cuboid::new(8.0, 0.5, 8.0),
+            },
         ));
         // cube
         commands.spawn((
@@ -178,7 +183,10 @@ impl MulticamPlugin {
             MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
             Transform::from_xyz(0.0, 0.5, 0.0),
             MulticamTestScene,
-            EditorSelectable { id: "Cube".to_owned() },
+            EditorSelectable {
+                id: "Cube".to_owned(),
+                bounding_box: Cuboid::new(1.0, 1.0, 1.0),
+            },
         ));
         // light
         commands.spawn((
@@ -189,6 +197,53 @@ impl MulticamPlugin {
             Transform::from_xyz(4.0, 8.0, 4.0),
             MulticamTestScene,
         ));
+    }
+
+    fn draw_camera_gizmos(
+        cameras: Query<(&Camera, &Multicam, &GlobalTransform, &Projection)>,
+        mut gizmos: Gizmos,
+    ) {
+        let color = Color::srgb_u8(255, 0 ,0);
+        let s = 0.0;
+        for (camera, multicam, camera_tfm, projection) in cameras {
+            let s = match projection {
+                Projection::Perspective(_) => -1.0,
+                Projection::Orthographic(_) => 0.0,
+                _ => 0.0,
+            };
+            
+            // gizmos.sphere(Isometry3d::from_translation(hit_data.point), 0.2, Color::srgb_u8(0, 255, 0));
+            let a = camera.ndc_to_world(camera_tfm, Vec3::new(-1.05, -1.05, 1.0));
+            let b = camera.ndc_to_world(camera_tfm, Vec3::new(1.05, -1.05, 1.0));
+            let c = camera.ndc_to_world(camera_tfm, Vec3::new(-1.05, 1.05, 1.0));
+            let d = camera.ndc_to_world(camera_tfm, Vec3::new(1.05, 1.05, 1.0));
+            let e = camera.ndc_to_world(camera_tfm, Vec3::new(-0.2, 1.1, 1.0));
+            let f = camera.ndc_to_world(camera_tfm, Vec3::new(0.2, 1.1, 1.0));
+            let g = camera.ndc_to_world(camera_tfm, Vec3::new(0.0, 1.4, 1.0));
+            match (a, b, c, d, e, f, g) {
+                (Some(a), Some(b), Some(c), Some(d), Some(e), Some(f), Some(g)) => {
+                    let a = a.lerp(camera_tfm.translation(), s);
+                    let b = b.lerp(camera_tfm.translation(), s);
+                    let c = c.lerp(camera_tfm.translation(), s);
+                    let d = d.lerp(camera_tfm.translation(), s);
+
+                    gizmos.line(a, b, color);
+                    gizmos.line(a, c, color);
+                    gizmos.line(d, c, color);
+                    gizmos.line(b, d, color);
+
+                    gizmos.line(a, camera_tfm.translation(), color);
+                    gizmos.line(b, camera_tfm.translation(), color);
+                    gizmos.line(c, camera_tfm.translation(), color);
+                    gizmos.line(d, camera_tfm.translation(), color);
+                    
+                    gizmos.line(e, f, color);
+                    gizmos.line(f, g, color);
+                    gizmos.line(e, g, color);
+                }
+                (_, _, _, _, _, _, _) => { info!("?") }
+            }
+        }
     }
 
     fn set_camera_viewports(
@@ -318,6 +373,7 @@ impl MulticamPlugin {
         pointers: Query<(&PointerId, &PointerLocation)>,
         primary_window_entity: Query<Entity, With<PrimaryWindow>>,
         mut gizmos: Gizmos,
+        mut selection: EventWriter<SelectionEvent>,
     ) {
         let ctx = egui_contexts.ctx_mut();
         if ctx.is_pointer_over_area() || ctx.wants_pointer_input() {
@@ -372,9 +428,22 @@ impl MulticamPlugin {
                             .first() {
                             if let Ok(selectable) = selectables.get(*hit_entity) {
                                 gizmos.line(ray.origin, hit_data.point, Color::srgb_u8(0, 255, 0));
+                                gizmos.sphere(Isometry3d::from_translation(hit_data.point), 0.2, Color::srgb_u8(0, 255, 0));
+                                
+                                if let Some(button) = button {
+                                    if mouse_buttons.just_pressed(button) {
+                                        selection.write(SelectionEvent { id: Some(*hit_entity) });
+                                    }
+                                }
                             }
                         } else {
                             gizmos.line(ray.origin, ray.origin + ray.direction * 100.0, Color::srgb_u8(255, 0, 0));
+
+                            if let Some(button) = button {
+                                if mouse_buttons.just_pressed(button) {
+                                    selection.write(SelectionEvent { id: None });
+                                }
+                            }
                         }
                     }
                 }

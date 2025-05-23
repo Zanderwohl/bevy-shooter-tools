@@ -4,6 +4,9 @@ use bevy_egui::{egui, EguiContextPass, EguiContexts};
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
 use crate::get;
+use crate::tool::selection::SelectionPlugin;
+
+pub mod selection;
 
 pub struct ToolPlugin;
 
@@ -11,6 +14,7 @@ impl Plugin for ToolPlugin {
     fn build(&self, app: &mut App) {
         app
             .init_resource::<ToolState>()
+            .add_plugins(SelectionPlugin)
             .add_systems(EguiContextPass, Self::toolbar)
         ;
     }
