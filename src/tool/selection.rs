@@ -33,38 +33,57 @@ impl SelectionPlugin {
         state: Res<SelectionState>,
         mut gizmos: Gizmos,
     ) {
-        let color = Color::srgb_u8(0, 255, 0);
+        let selected_color = Color::srgb_u8(0, 255, 0);
+        let hovered_color = Color::srgb_u8(230, 230, 230);
+        let same_color = Color::srgb_u8(230, 230, 0);
         for (entity, transform, select) in selectables {
+            let same = match (state.selected, state.hovered) {
+                (Some(a), Some(b)) => a == b,
+                _ => false,
+            };
             if let Some(selected) = state.selected {
+                let color = if same { same_color } else { selected_color };
                 if selected == entity {
-                    // Draw box from select.bounding_box using the gizmos
-                    let a = transform.translation + Vec3::ZERO.with_x(select.bounding_box.half_size.x).with_y(select.bounding_box.half_size.y).with_z(select.bounding_box.half_size.z);
-                    let b = transform.translation + Vec3::ZERO.with_x(-select.bounding_box.half_size.x).with_y(select.bounding_box.half_size.y).with_z(select.bounding_box.half_size.z);
-                    let c = transform.translation + Vec3::ZERO.with_x(-select.bounding_box.half_size.x).with_y(-select.bounding_box.half_size.y).with_z(select.bounding_box.half_size.z);
-                    let d = transform.translation + Vec3::ZERO.with_x(select.bounding_box.half_size.x).with_y(-select.bounding_box.half_size.y).with_z(select.bounding_box.half_size.z);
-
-                    let e = transform.translation + Vec3::ZERO.with_x(select.bounding_box.half_size.x).with_y(select.bounding_box.half_size.y).with_z(-select.bounding_box.half_size.z);
-                    let f = transform.translation + Vec3::ZERO.with_x(-select.bounding_box.half_size.x).with_y(select.bounding_box.half_size.y).with_z(-select.bounding_box.half_size.z);
-                    let g = transform.translation + Vec3::ZERO.with_x(-select.bounding_box.half_size.x).with_y(-select.bounding_box.half_size.y).with_z(-select.bounding_box.half_size.z);
-                    let h = transform.translation + Vec3::ZERO.with_x(select.bounding_box.half_size.x).with_y(-select.bounding_box.half_size.y).with_z(-select.bounding_box.half_size.z);
-                    
-                    gizmos.line(a, b, color);
-                    gizmos.line(b, c, color);
-                    gizmos.line(c, d, color);
-                    gizmos.line(d, a, color);
-
-                    gizmos.line(e, f, color);
-                    gizmos.line(f, g, color);
-                    gizmos.line(g, h, color);
-                    gizmos.line(h, e, color);
-
-                    gizmos.line(a, e, color);
-                    gizmos.line(b, f, color);
-                    gizmos.line(c, g, color);
-                    gizmos.line(d, h, color);
+                    Self::draw_bounding_box(&mut gizmos, color, transform, select);
+                }
+            }
+            if let Some(hovered) = state.hovered {
+                if hovered == entity {
+                    Self::draw_bounding_box(&mut gizmos, hovered_color, transform, select);
                 }
             }
         }
+    }
+    
+    fn local_to_world(transform: &Transform, point: &Vec3) -> Vec3 {
+        transform.transform_point(*point)
+    }
+
+    fn draw_bounding_box(gizmos: &mut Gizmos, color: Color, transform: &Transform, select: &EditorSelectable) {
+        let a = transform.transform_point(Vec3::ZERO.with_x(select.bounding_box.half_size.x).with_y(select.bounding_box.half_size.y).with_z(select.bounding_box.half_size.z));
+        let b = transform.transform_point(Vec3::ZERO.with_x(-select.bounding_box.half_size.x).with_y(select.bounding_box.half_size.y).with_z(select.bounding_box.half_size.z));
+        let c = transform.transform_point(Vec3::ZERO.with_x(-select.bounding_box.half_size.x).with_y(-select.bounding_box.half_size.y).with_z(select.bounding_box.half_size.z));
+        let d = transform.transform_point(Vec3::ZERO.with_x(select.bounding_box.half_size.x).with_y(-select.bounding_box.half_size.y).with_z(select.bounding_box.half_size.z));
+
+        let e = transform.transform_point(Vec3::ZERO.with_x(select.bounding_box.half_size.x).with_y(select.bounding_box.half_size.y).with_z(-select.bounding_box.half_size.z));
+        let f = transform.transform_point(Vec3::ZERO.with_x(-select.bounding_box.half_size.x).with_y(select.bounding_box.half_size.y).with_z(-select.bounding_box.half_size.z));
+        let g = transform.transform_point(Vec3::ZERO.with_x(-select.bounding_box.half_size.x).with_y(-select.bounding_box.half_size.y).with_z(-select.bounding_box.half_size.z));
+        let h = transform.transform_point(Vec3::ZERO.with_x(select.bounding_box.half_size.x).with_y(-select.bounding_box.half_size.y).with_z(-select.bounding_box.half_size.z));
+
+        gizmos.line(a, b, color);
+        gizmos.line(b, c, color);
+        gizmos.line(c, d, color);
+        gizmos.line(d, a, color);
+
+        gizmos.line(e, f, color);
+        gizmos.line(f, g, color);
+        gizmos.line(g, h, color);
+        gizmos.line(h, e, color);
+
+        gizmos.line(a, e, color);
+        gizmos.line(b, f, color);
+        gizmos.line(c, g, color);
+        gizmos.line(d, h, color);
     }
 }
 
@@ -81,5 +100,6 @@ pub struct SelectionEvent {
 
 #[derive(Resource, Default)]
 pub struct SelectionState {
-    selected: Option<Entity>,
+    pub hovered: Option<Entity>,
+    pub selected: Option<Entity>,
 }

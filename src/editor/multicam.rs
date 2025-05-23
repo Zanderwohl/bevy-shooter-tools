@@ -10,7 +10,7 @@ use bevy::render::view::RenderLayers;
 use bevy::window::{PrimaryWindow, WindowResized};
 use bevy_egui::{egui, EguiContextPass, EguiContexts};
 use bevy_vector_shapes::prelude::*;
-use crate::tool::selection::{EditorSelectable, SelectionEvent};
+use crate::tool::selection::{EditorSelectable, SelectionEvent, SelectionState};
 use crate::get;
 
 pub struct MulticamPlugin {
@@ -24,7 +24,9 @@ pub struct MulticamState {
     pub end: Vec2,
     pub debug_window: bool,
     pub debug_viewport_box: bool,
+    pub debug_mouseover_boxes: bool,
     pub debug_mouse_circle: bool,
+    pub debug_mouse_probe: bool,
 }
 
 #[derive(Component)]
@@ -44,8 +46,10 @@ impl Default for MulticamState {
             start: Vec2::new(0.1, 0.1),
             end: Vec2::new(0.9, 0.9), // This MUST be more than start or else the first frame will crash.
             debug_viewport_box: false,
+            debug_mouseover_boxes: false,
             debug_mouse_circle: false,
-            debug_window: false,
+            debug_mouse_probe: false,
+            debug_window: true,
         }
     }
 }
@@ -174,7 +178,7 @@ impl MulticamPlugin {
             MulticamTestScene,
             EditorSelectable {
                 id: "Base".to_owned(),
-                bounding_box: Cuboid::new(8.0, 0.5, 8.0),
+                bounding_box: Cuboid::new(8.0, 8.0, 0.5),
             },
         ));
         // cube
@@ -184,10 +188,22 @@ impl MulticamPlugin {
             Transform::from_xyz(0.0, 0.5, 0.0),
             MulticamTestScene,
             EditorSelectable {
-                id: "Cube".to_owned(),
+                id: "Cube 1".to_owned(),
                 bounding_box: Cuboid::new(1.0, 1.0, 1.0),
             },
         ));
+        // cube
+        commands.spawn((
+            Mesh3d(meshes.add(Cuboid::new(1.0, 1.0, 1.0))),
+            MeshMaterial3d(materials.add(Color::srgb_u8(255, 144, 124))),
+            Transform::from_xyz(1.3, 0.5, 0.0).with_rotation(Quat::from_rotation_y(2.0 * std::f32::consts::FRAC_PI_2 / 3.0)),
+            MulticamTestScene,
+            EditorSelectable {
+                id: "Cube 2".to_owned(),
+                bounding_box: Cuboid::new(1.0, 1.0, 1.0),
+            },
+        ));
+        
         // light
         commands.spawn((
             PointLight {
@@ -356,6 +372,8 @@ impl MulticamPlugin {
             ui.heading(get!("debug.viewport.draw.title"));
             ui.checkbox(&mut state.debug_mouse_circle, get!("debug.viewport.draw.mouse"));
             ui.checkbox(&mut state.debug_viewport_box, get!("debug.viewport.draw.box"));
+            ui.checkbox(&mut state.debug_mouseover_boxes, get!("debug.viewport.draw.mouseover"));
+            ui.checkbox(&mut state.debug_mouse_probe, get!("debug.viewport.draw.probe"));
         });
     }
 
@@ -374,6 +392,7 @@ impl MulticamPlugin {
         primary_window_entity: Query<Entity, With<PrimaryWindow>>,
         mut gizmos: Gizmos,
         mut selection: EventWriter<SelectionEvent>,
+        mut selection_state: ResMut<SelectionState>,
     ) {
         let ctx = egui_contexts.ctx_mut();
         if ctx.is_pointer_over_area() || ctx.wants_pointer_input() {
@@ -427,8 +446,12 @@ impl MulticamPlugin {
                             .cast_ray(ray, &settings)
                             .first() {
                             if let Ok(selectable) = selectables.get(*hit_entity) {
-                                gizmos.line(ray.origin, hit_data.point, Color::srgb_u8(0, 255, 0));
-                                gizmos.sphere(Isometry3d::from_translation(hit_data.point), 0.2, Color::srgb_u8(0, 255, 0));
+                                if state.debug_mouse_probe {
+                                    gizmos.line(ray.origin, hit_data.point, Color::srgb_u8(0, 255, 0));
+                                    gizmos.sphere(Isometry3d::from_translation(hit_data.point), 0.2, Color::srgb_u8(0, 255, 0));
+                                }
+                                
+                                selection_state.hovered = Some(*hit_entity);
                                 
                                 if let Some(button) = button {
                                     if mouse_buttons.just_pressed(button) {
@@ -437,8 +460,11 @@ impl MulticamPlugin {
                                 }
                             }
                         } else {
-                            gizmos.line(ray.origin, ray.origin + ray.direction * 100.0, Color::srgb_u8(255, 0, 0));
+                            if state.debug_mouse_probe {
+                                gizmos.line(ray.origin, ray.origin + ray.direction * 100.0, Color::srgb_u8(255, 0, 0));
+                            }
 
+                            selection_state.hovered = None;
                             if let Some(button) = button {
                                 if mouse_buttons.just_pressed(button) {
                                     selection.write(SelectionEvent { id: None });
@@ -461,7 +487,7 @@ impl MulticamPlugin {
                             physical_cursor_y >= vp_min.y && physical_cursor_y < vp_max.y
                         {
                             if let Some(button) = button {
-                                if mouse_buttons.pressed(button) {
+                                if mouse_buttons.pressed(button) && state.debug_mouseover_boxes {
                                     Self::draw_indicator_box(&mut painter, &ui_cam, viewport, button);
                                 }
                             } else {
@@ -475,7 +501,9 @@ impl MulticamPlugin {
                                 let min = window_to_painter(&ui_cam, min);
                                 let max = window_to_painter(&ui_cam, max);
 
-                                draw_rect(&mut painter, min, max);
+                                if state.debug_mouseover_boxes {
+                                    draw_rect(&mut painter, min, max);
+                                }
                             }
 
                             break; // Border drawn for the first viewport found under cursor

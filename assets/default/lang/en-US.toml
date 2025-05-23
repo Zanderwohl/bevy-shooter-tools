@@ -18,6 +18,8 @@ end = "End"
 title = "Draw Debug Indicators"
 mouse = "Mouse Circle"
 box = "Viewport Box"
+mouseover = "Mouseover Boxes"
+probe = "Mouse Probe"
 
 [tools]
 title = "Tools"
