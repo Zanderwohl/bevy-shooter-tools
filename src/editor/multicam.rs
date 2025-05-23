@@ -159,32 +159,36 @@ impl MulticamPlugin {
 
         // Only spawn the test cube if test_scene is true
         if state.test_scene {
-            // circular base
-            commands.spawn((
-                Mesh3d(meshes.add(Circle::new(4.0))),
-                MeshMaterial3d(materials.add(Color::WHITE)),
-                Transform::from_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2)),
-                MulticamTestScene,
-                EditorSelectable { id: "Base".to_owned() },
-            ));
-            // cube
-            commands.spawn((
-                Mesh3d(meshes.add(Cuboid::new(1.0, 1.0, 1.0))),
-                MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
-                Transform::from_xyz(0.0, 0.5, 0.0),
-                MulticamTestScene,
-                EditorSelectable { id: "Cube".to_owned() },
-            ));
-            // light
-            commands.spawn((
-                PointLight {
-                    shadows_enabled: true,
-                    ..default()
-                },
-                Transform::from_xyz(4.0, 8.0, 4.0),
-                MulticamTestScene,
-            ));
+            Self::spawn_test_scene(&mut commands, meshes, materials);
         }
+    }
+
+    fn spawn_test_scene(commands: &mut Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<StandardMaterial>>) {
+        // circular base
+        commands.spawn((
+            Mesh3d(meshes.add(Circle::new(4.0))),
+            MeshMaterial3d(materials.add(Color::WHITE)),
+            Transform::from_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2)),
+            MulticamTestScene,
+            EditorSelectable { id: "Base".to_owned() },
+        ));
+        // cube
+        commands.spawn((
+            Mesh3d(meshes.add(Cuboid::new(1.0, 1.0, 1.0))),
+            MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
+            Transform::from_xyz(0.0, 0.5, 0.0),
+            MulticamTestScene,
+            EditorSelectable { id: "Cube".to_owned() },
+        ));
+        // light
+        commands.spawn((
+            PointLight {
+                shadows_enabled: true,
+                ..default()
+            },
+            Transform::from_xyz(4.0, 8.0, 4.0),
+            MulticamTestScene,
+        ));
     }
 
     fn set_camera_viewports(
@@ -367,10 +371,10 @@ impl MulticamPlugin {
                             .cast_ray(ray, &settings)
                             .first() {
                             if let Ok(selectable) = selectables.get(*hit_entity) {
-                                gizmos.line(ray.origin, hit_data.point, Color::srgb_u8(255, 0, 0));
+                                gizmos.line(ray.origin, hit_data.point, Color::srgb_u8(0, 255, 0));
                             }
                         } else {
-                            gizmos.line(ray.origin, ray.origin + ray.direction * 100.0, Color::srgb_u8(0, 255, 0));
+                            gizmos.line(ray.origin, ray.origin + ray.direction * 100.0, Color::srgb_u8(255, 0, 0));
                         }
                     }
                 }
