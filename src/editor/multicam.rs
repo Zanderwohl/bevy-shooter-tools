@@ -1,6 +1,7 @@
 use bevy::core_pipeline::bloom::Bloom;
 use bevy::core_pipeline::tonemapping::Tonemapping;
 use bevy::diagnostic::FrameCount;
+use bevy::ecs::query::QuerySingleError;
 use bevy::input::mouse::MouseMotion;
 use bevy::prelude::*;
 use bevy::render::camera::Viewport;
@@ -12,6 +13,7 @@ use bevy_egui::{egui, EguiContextPass, EguiContexts};
 use bevy_vector_shapes::prelude::*;
 use crate::tool::selection::{EditorSelectable, SelectionEvent, SelectionState};
 use crate::get;
+use crate::tool::movement::MovementEvent;
 
 pub struct MulticamPlugin {
     pub test_scene: bool,
@@ -178,7 +180,7 @@ impl MulticamPlugin {
             MulticamTestScene,
             EditorSelectable {
                 id: "Base".to_owned(),
-                bounding_box: Cuboid::new(8.0, 8.0, 0.5),
+                bounding_box: Cuboid::new(8.0, 8.0, 0.2),
             },
         ));
         // cube
@@ -196,7 +198,7 @@ impl MulticamPlugin {
         commands.spawn((
             Mesh3d(meshes.add(Cuboid::new(1.0, 1.0, 1.0))),
             MeshMaterial3d(materials.add(Color::srgb_u8(255, 144, 124))),
-            Transform::from_xyz(1.3, 0.5, 0.0).with_rotation(Quat::from_rotation_y(2.0 * std::f32::consts::FRAC_PI_2 / 3.0)),
+            Transform::from_xyz(1.3, 0.5, 1.0).with_rotation(Quat::from_rotation_y(2.0 * std::f32::consts::FRAC_PI_2 / 3.0)),
             MulticamTestScene,
             EditorSelectable {
                 id: "Cube 2".to_owned(),
@@ -384,7 +386,7 @@ impl MulticamPlugin {
         cameras_q: Query<(Entity, &Camera, &GlobalTransform, &Multicam)>,
         ui_cam: Query<(&Camera, &Camera2d), Without<Multicam>>,
         mut painter: ShapePainter,
-        mut _evr_motion: EventReader<MouseMotion>,
+        mut evr_motion: EventReader<MouseMotion>,
         mut egui_contexts: EguiContexts,
         mut ray_cast: MeshRayCast,
         selectables: Query<&EditorSelectable>,
@@ -393,6 +395,7 @@ impl MulticamPlugin {
         mut gizmos: Gizmos,
         mut selection: EventWriter<SelectionEvent>,
         mut selection_state: ResMut<SelectionState>,
+        mut movement_events: EventWriter<MovementEvent>,
     ) {
         let ctx = egui_contexts.ctx_mut();
         if ctx.is_pointer_over_area() || ctx.wants_pointer_input() {
@@ -415,25 +418,7 @@ impl MulticamPlugin {
             button = Some(MouseButton::Right);
         }
 
-        if let Ok((ui_cam, _)) = ui_cam {
-            if state.debug_viewport_box {
-                painter.reset();
-                painter.render_layers = Some(RenderLayers::layer(31));
-                let viewport_start = window_to_painter_frac(&ui_cam, state.start).extend(1.0);
-                let viewport_end = window_to_painter_frac(&ui_cam, state.end).extend(1.0);
-                painter.color = Color::srgb_u8(0, 0, 255);
-                draw_rect(&mut painter, viewport_start.truncate(), viewport_end.truncate());
-            }
-
-            if state.debug_mouse_circle {
-                if let Some(cursor_window_pos) = window.cursor_position() {
-                    painter.reset();
-                    painter.render_layers = Some(RenderLayers::layer(31));
-                    painter.set_translation(window_to_painter(&ui_cam, cursor_window_pos).extend(1.0));
-                    painter.circle(10.0);
-                }
-            }
-        }
+        Self::debug_ui_boxes(&state, &mut painter, window, &ui_cam);
 
         let filter = |entity| selectables.get(entity).is_ok();
         let settings = MeshRayCastSettings::default().with_filter(&filter);
@@ -509,6 +494,39 @@ impl MulticamPlugin {
                             break; // Border drawn for the first viewport found under cursor
                         }
                     }
+                }
+                
+               // if let Some(viewport) = &camera.viewport {
+                    // If mouse is in viewport, generate event.
+                    movement_events.write(MovementEvent {
+                        mouse_button: button,
+                        mouse_pos: cursor_pos_window,
+                        mouse_delta: Vec2::ZERO,
+                        camera: camera_entity,
+                        camera_translation: Default::default(),
+                    });
+                //}
+            }
+        }
+    }
+
+    fn debug_ui_boxes(state: &ResMut<MulticamState>, mut painter: &mut ShapePainter, window: &Window, ui_cam: &Result<(&Camera, &Camera2d), QuerySingleError>) {
+        if let Ok((ui_cam, _)) = ui_cam {
+            if state.debug_viewport_box {
+                painter.reset();
+                painter.render_layers = Some(RenderLayers::layer(31));
+                let viewport_start = window_to_painter_frac(&ui_cam, state.start).extend(1.0);
+                let viewport_end = window_to_painter_frac(&ui_cam, state.end).extend(1.0);
+                painter.color = Color::srgb_u8(0, 0, 255);
+                draw_rect(&mut painter, viewport_start.truncate(), viewport_end.truncate());
+            }
+
+            if state.debug_mouse_circle {
+                if let Some(cursor_window_pos) = window.cursor_position() {
+                    painter.reset();
+                    painter.render_layers = Some(RenderLayers::layer(31));
+                    painter.set_translation(window_to_painter(&ui_cam, cursor_window_pos).extend(1.0));
+                    painter.circle(10.0);
                 }
             }
         }

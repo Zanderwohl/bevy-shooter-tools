@@ -24,7 +24,11 @@ impl SelectionPlugin {
         mut state: ResMut<SelectionState>,
     ) {
         for selection in selection_events.read() {
-            state.selected = selection.id;
+            if state.selected == selection.id {
+                state.selected = None;
+            } else {
+                state.selected = selection.id;
+            }
         }
     }
 
