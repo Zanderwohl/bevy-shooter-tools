@@ -43,7 +43,6 @@ impl Default for ToolData {
 pub enum Tools {
     #[default]
     Select,
-    Move,
     Room,
 }
 
@@ -51,7 +50,6 @@ impl Tools {
     fn name(&self) -> String {
         match self {
             Self::Select => get!("tools.select"),
-            Self::Move => get!("tools.move"),
             Self::Room => get!("tools.room"),
         }
     }

@@ -20,17 +20,30 @@ impl Plugin for MovementPlugin {
 impl MovementPlugin {
     fn handle(
         current_input: Res<CurrentInput>,
-        mut cameras: Query<(Entity, &mut Transform, &Multicam), With<Camera>>,
+        mut cameras: Query<(Entity, &mut Transform, &Multicam, &Projection, &Camera)>,
     ) {
         // For now, let's make middle click orbit for 3d cams and turn for 2d cam
         // and shift + middle click as pan
         if let Some(cam_id) = current_input.in_camera {
             if let Some(button) = current_input.pressed {
-                
                 if button == MouseButton::Middle {
-                    for (entity, mut transform, multicam) in &mut cameras {
+                    for (entity, mut transform, multicam, projection, camera) in &mut cameras {
                         if cam_id == entity {
-                            info!("moving cam {}", multicam.name);
+                            let delta = current_input.delta_pos;
+                            info!("{}: {}", multicam.name, delta);
+                            match projection {
+                                Projection::Perspective(_) => {}
+                                Projection::Orthographic(ortho_projection) => {
+                                    let pan_scaled_x = delta.x * ortho_projection.scale;
+                                    let pan_scaled_y = delta.y * ortho_projection.scale;
+                                    
+                                    let local_x = transform.local_x();
+                                    transform.translation -= local_x * pan_scaled_x;
+                                    let local_y = transform.local_y();
+                                    transform.translation += local_y * pan_scaled_y;
+                                }
+                                Projection::Custom(_) => {}
+                            }
                         }
                     }
                 }
