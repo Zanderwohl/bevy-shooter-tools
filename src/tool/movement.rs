@@ -1,8 +1,7 @@
 use bevy::app::App;
 use bevy::prelude::*;
-use crate::editor::input::CurrentInput;
+use crate::editor::input::{CurrentKeyboardInput, CurrentMouseInput};
 use crate::editor::multicam::Multicam;
-use crate::tool::Tools;
 
 pub struct MovementPlugin;
 
@@ -19,23 +18,25 @@ impl Plugin for MovementPlugin {
 
 impl MovementPlugin {
     fn handle(
-        current_input: Res<CurrentInput>,
+        mouse_input: Res<CurrentMouseInput>,
+        keyboard_input: Res<CurrentKeyboardInput>,
         mut cameras: Query<(Entity, &mut Transform, &Multicam, &Projection, &Camera)>,
     ) {
         // For now, let's make middle click orbit for 3d cams and turn for 2d cam
         // and shift + middle click as pan
-        if let Some(cam_id) = current_input.in_camera {
-            if let Some(button) = current_input.pressed {
+        if let Some(cam_id) = mouse_input.started_in_camera {
+            if let Some(button) = mouse_input.pressed {
                 if button == MouseButton::Middle {
                     for (entity, mut transform, multicam, projection, camera) in &mut cameras {
                         if cam_id == entity {
-                            let delta = current_input.delta_pos;
-                            info!("{}: {}", multicam.name, delta);
+                            let delta = mouse_input.delta_pos;
                             match projection {
-                                Projection::Perspective(_) => {}
-                                Projection::Orthographic(ortho_projection) => {
-                                    let pan_scaled_x = delta.x * ortho_projection.scale;
-                                    let pan_scaled_y = delta.y * ortho_projection.scale;
+                                Projection::Perspective(projection) => {
+                                    
+                                }
+                                Projection::Orthographic(projection) => {
+                                    let pan_scaled_x = delta.x * projection.scale;
+                                    let pan_scaled_y = delta.y * projection.scale;
                                     
                                     let local_x = transform.local_x();
                                     transform.translation -= local_x * pan_scaled_x;

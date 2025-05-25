@@ -13,17 +13,22 @@ pub struct EditorInputPlugin;
 impl Plugin for EditorInputPlugin {
     fn build(&self, app: &mut App) {
         app
-            .init_resource::<CurrentInput>()
-            .add_systems(PreUpdate, Self::mouse_input)
+            .init_resource::<CurrentMouseInput>()
+            .init_resource::<CurrentKeyboardInput>()
+            .add_systems(PreUpdate, (
+                Self::mouse_input,
+                Self::keyboard_input,
+            ))
         ;
     }
 }
 
 #[derive(Resource)]
-pub struct CurrentInput {
+pub struct CurrentMouseInput {
     pub pressed: Option<MouseButton>,
     pub released: Option<MouseButton>,
     pub in_camera: Option<Entity>,
+    pub started_in_camera: Option<Entity>,
     pub local_pos: Option<Vec2>,
     pub delta_pos: Vec2,
     pub normalized_pos: Option<Vec2>,
@@ -31,12 +36,13 @@ pub struct CurrentInput {
     pub world_pos: Option<Ray3d>,
 }
 
-impl Default for CurrentInput {
+impl Default for CurrentMouseInput {
     fn default() -> Self {
         Self {
             pressed: None,
             released: None,
             in_camera: None,
+            started_in_camera: None,
             local_pos: None,
             delta_pos: Vec2::ZERO,
             normalized_pos: None,
@@ -46,7 +52,12 @@ impl Default for CurrentInput {
     }
 }
 
-impl Display for CurrentInput {
+#[derive(Resource, Default)]
+pub struct CurrentKeyboardInput {
+    pub modify: bool,
+}
+
+impl Display for CurrentMouseInput {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "local: {:?}, normalized: {:?}, global: {:?}", self.local_pos, self.normalized_pos, self.global_pos)
     }
@@ -58,7 +69,7 @@ impl EditorInputPlugin {
         primary_window_entity: Query<Entity, With<PrimaryWindow>>,
         primary_window: Query<&Window, With<PrimaryWindow>>,
         mouse_buttons: Res<ButtonInput<MouseButton>>,
-        mut current_input: ResMut<CurrentInput>,
+        mut current_input: ResMut<CurrentMouseInput>,
         cameras: Query<(Entity, &Camera, &GlobalTransform, &Multicam)>,
         pointers: Query<(&PointerId, &PointerLocation)>,
         mut evr_motion: EventReader<MouseMotion>,
@@ -70,7 +81,7 @@ impl EditorInputPlugin {
         }
 
         let window = primary_window.single().unwrap();
-        let (pressed, released) = mouse_precedence(mouse_buttons);
+        let (just_pressed, pressed, released) = mouse_precedence(mouse_buttons);
         current_input.pressed = pressed;
         current_input.released = released;
 
@@ -79,6 +90,13 @@ impl EditorInputPlugin {
             for (camera_entity, camera, camera_transform, cam_multicam) in &cameras {
                 if let Some(pointer_loc) = pointer.location() {
                     if pointer_loc.is_in_viewport(camera, &primary_window_entity) {
+                        if pressed.is_some() {
+                            if just_pressed {
+                                current_input.started_in_camera = Some(camera_entity);
+                            }
+                        } else {
+                            current_input.started_in_camera = None;
+                        }
                         let (position, normalized, ray) = match &camera.viewport {
                             Some(viewport) => {
                                 let pos = pointer_loc.position - viewport.physical_position.as_vec2();
@@ -116,6 +134,13 @@ impl EditorInputPlugin {
             current_input.delta_pos.y += ev.delta.y;
         }
     }
+    
+    fn keyboard_input(
+        mut current_input: ResMut<CurrentKeyboardInput>,
+        keys: Res<ButtonInput<KeyCode>>,
+    ) {
+        current_input.modify = keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight);
+    }
 }
 
 fn make_ray(
@@ -131,7 +156,7 @@ fn make_ray(
     camera.viewport_to_world(camera_tfm, pointer_loc.position).ok()
 }
 
-fn mouse_precedence(mouse_buttons: Res<ButtonInput<MouseButton>>) -> (Option<MouseButton>, Option<MouseButton>) {
+fn mouse_precedence(mouse_buttons: Res<ButtonInput<MouseButton>>) -> (bool, Option<MouseButton>, Option<MouseButton>) {
     let left = mouse_buttons.pressed(MouseButton::Left);
     let right = mouse_buttons.pressed(MouseButton::Right);
     let middle = mouse_buttons.pressed(MouseButton::Middle);
@@ -142,25 +167,25 @@ fn mouse_precedence(mouse_buttons: Res<ButtonInput<MouseButton>>) -> (Option<Mou
     
     if !left && !right && !middle {
         if left_released && !right_released && !middle_released {
-            return (None, Some(MouseButton::Left));
+            return (false, None, Some(MouseButton::Left));
         }
         if right_released && !left_released && !middle_released {
-            return (None, Some(MouseButton::Right));
+            return (false, None, Some(MouseButton::Right));
         }
         if middle_released && !left_released && !right_released {
-            return (None, Some(MouseButton::Middle));
+            return (false, None, Some(MouseButton::Middle));
         }
     }
 
     if left && !right && !middle {
-        return (Some(MouseButton::Left), None);
+        return (mouse_buttons.just_pressed(MouseButton::Left), Some(MouseButton::Left), None);
     }
     if right && !left && !middle {
-        return (Some(MouseButton::Right), None);
+        return (mouse_buttons.just_pressed(MouseButton::Right), Some(MouseButton::Right), None);
     }
     if middle && !left && !right {
-        return (Some(MouseButton::Middle), None);
+        return (mouse_buttons.just_pressed(MouseButton::Middle), Some(MouseButton::Middle), None);
     }
 
-    (None, None)
+    (false, None, None)
 }

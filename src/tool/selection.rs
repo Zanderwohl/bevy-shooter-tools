@@ -2,7 +2,7 @@ use std::env::current_exe;
 use bevy::app::App;
 use bevy::math::bounding::Bounded3d;
 use bevy::prelude::*;
-use crate::editor::input::CurrentInput;
+use crate::editor::input::CurrentMouseInput;
 
 pub struct SelectionPlugin;
 
@@ -21,7 +21,7 @@ impl Plugin for SelectionPlugin {
 impl SelectionPlugin {
     fn select(
         mut state: ResMut<SelectionState>,
-        current_input: Res<CurrentInput>,
+        current_input: Res<CurrentMouseInput>,
         selectables: Query<&EditorSelectable>,
         mut ray_cast: MeshRayCast,
         mut gizmos: Gizmos,
@@ -33,15 +33,19 @@ impl SelectionPlugin {
             if let Some((hit_entity, hit_data)) = ray_cast
                 .cast_ray(ray, &settings)
                 .first() {
-                gizmos.line(ray.origin, hit_data.point, Color::srgb_u8(0, 255, 0));
-                gizmos.sphere(Isometry3d::from_translation(hit_data.point), 0.2, Color::srgb_u8(0, 255, 0));
-
+                if state.debug_probe {
+                    gizmos.line(ray.origin, hit_data.point, Color::srgb_u8(0, 255, 0));
+                    gizmos.sphere(Isometry3d::from_translation(hit_data.point), 0.2, Color::srgb_u8(0, 255, 0));
+                }
+                
                 state.hovered = Some(*hit_entity);
                 if current_input.released == Some(MouseButton::Left) {
                     state.selected = Some(*hit_entity);
                 }
             } else {
-                gizmos.line(ray.origin, ray.origin + ray.direction * 100.0, Color::srgb_u8(255, 0, 0));
+                if state.debug_probe {
+                    gizmos.line(ray.origin, ray.origin + ray.direction * 100.0, Color::srgb_u8(255, 0, 0));
+                }
                 state.hovered = None;
                 if current_input.released == Some(MouseButton::Left) {
                     state.selected = None;
@@ -121,4 +125,5 @@ pub struct EditorSelectable {
 pub struct SelectionState {
     pub hovered: Option<Entity>,
     pub selected: Option<Entity>,
+    debug_probe: bool,
 }
