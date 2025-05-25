@@ -11,7 +11,7 @@ use bevy::render::view::RenderLayers;
 use bevy::window::{PrimaryWindow, WindowResized};
 use bevy_egui::{egui, EguiContextPass, EguiContexts};
 use bevy_vector_shapes::prelude::*;
-use crate::tool::selection::{EditorSelectable, SelectionEvent, SelectionState};
+use crate::tool::selection::{EditorSelectable, SelectionState};
 use crate::get;
 use crate::tool::movement::MovementEvent;
 
@@ -28,7 +28,6 @@ pub struct MulticamState {
     pub debug_viewport_box: bool,
     pub debug_mouseover_boxes: bool,
     pub debug_mouse_circle: bool,
-    pub debug_mouse_probe: bool,
 }
 
 #[derive(Component)]
@@ -50,7 +49,6 @@ impl Default for MulticamState {
             debug_viewport_box: false,
             debug_mouseover_boxes: false,
             debug_mouse_circle: false,
-            debug_mouse_probe: false,
             debug_window: true,
         }
     }
@@ -66,7 +64,7 @@ impl Plugin for MulticamPlugin {
             .add_systems(Startup, Self::setup)
             .add_systems(Update, (
                 Self::set_camera_viewports,
-                Self::handle_input,
+                Self::debug_boxes,
                 Self::draw_camera_gizmos,
             ))
             .add_systems(EguiContextPass, Self::debug_window)
@@ -375,26 +373,17 @@ impl MulticamPlugin {
             ui.checkbox(&mut state.debug_mouse_circle, get!("debug.viewport.draw.mouse"));
             ui.checkbox(&mut state.debug_viewport_box, get!("debug.viewport.draw.box"));
             ui.checkbox(&mut state.debug_mouseover_boxes, get!("debug.viewport.draw.mouseover"));
-            ui.checkbox(&mut state.debug_mouse_probe, get!("debug.viewport.draw.probe"));
         });
     }
 
-    fn handle_input(
+    fn debug_boxes(
         state: ResMut<MulticamState>,
         mouse_buttons: Res<ButtonInput<MouseButton>>,
         windows: Query<&Window, With<PrimaryWindow>>,
         cameras_q: Query<(Entity, &Camera, &GlobalTransform, &Multicam)>,
         ui_cam: Query<(&Camera, &Camera2d), Without<Multicam>>,
         mut painter: ShapePainter,
-        mut evr_motion: EventReader<MouseMotion>,
         mut egui_contexts: EguiContexts,
-        mut ray_cast: MeshRayCast,
-        selectables: Query<&EditorSelectable>,
-        pointers: Query<(&PointerId, &PointerLocation)>,
-        primary_window_entity: Query<Entity, With<PrimaryWindow>>,
-        mut gizmos: Gizmos,
-        mut selection: EventWriter<SelectionEvent>,
-        mut selection_state: ResMut<SelectionState>,
         mut movement_events: EventWriter<MovementEvent>,
     ) {
         let ctx = egui_contexts.ctx_mut();
@@ -420,45 +409,8 @@ impl MulticamPlugin {
 
         Self::debug_ui_boxes(&state, &mut painter, window, &ui_cam);
 
-        let filter = |entity| selectables.get(entity).is_ok();
-        let settings = MeshRayCastSettings::default().with_filter(&filter);
-
         if let Some(cursor_pos_window) = window.cursor_position() {
             for (camera_entity, camera, camera_tfm, camera_multicam) in &cameras_q {
-                for (&pointer_id, pointer_loc) in &pointers {
-                    if let Some(ray) = make_ray(&primary_window_entity, camera, camera_tfm, pointer_loc) {
-                        if let Some((hit_entity, hit_data)) = ray_cast
-                            .cast_ray(ray, &settings)
-                            .first() {
-                            if let Ok(selectable) = selectables.get(*hit_entity) {
-                                if state.debug_mouse_probe {
-                                    gizmos.line(ray.origin, hit_data.point, Color::srgb_u8(0, 255, 0));
-                                    gizmos.sphere(Isometry3d::from_translation(hit_data.point), 0.2, Color::srgb_u8(0, 255, 0));
-                                }
-                                
-                                selection_state.hovered = Some(*hit_entity);
-                                
-                                if let Some(button) = button {
-                                    if mouse_buttons.just_pressed(button) {
-                                        selection.write(SelectionEvent { id: Some(*hit_entity) });
-                                    }
-                                }
-                            }
-                        } else {
-                            if state.debug_mouse_probe {
-                                gizmos.line(ray.origin, ray.origin + ray.direction * 100.0, Color::srgb_u8(255, 0, 0));
-                            }
-
-                            selection_state.hovered = None;
-                            if let Some(button) = button {
-                                if mouse_buttons.just_pressed(button) {
-                                    selection.write(SelectionEvent { id: None });
-                                }
-                            }
-                        }
-                    }
-                }
-
                 if let Ok((ui_cam, _)) = ui_cam {
                     if let Some(viewport) = &camera.viewport {
                         let vp_min = viewport.physical_position.as_vec2();

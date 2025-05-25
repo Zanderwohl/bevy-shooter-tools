@@ -20,13 +20,13 @@ impl Plugin for EditorInputPlugin {
 
 #[derive(Resource)]
 pub struct CurrentInput {
-    pressed: Option<MouseButton>,
-    released: Option<MouseButton>,
-    in_camera: Option<Entity>,
-    local_pos: Option<Vec2>,
-    normalized_pos: Option<Vec2>,
-    global_pos: Option<Vec2>,
-    world_pos: Option<Ray3d>,
+    pub pressed: Option<MouseButton>,
+    pub released: Option<MouseButton>,
+    pub in_camera: Option<Entity>,
+    pub local_pos: Option<Vec2>,
+    pub normalized_pos: Option<Vec2>,
+    pub global_pos: Option<Vec2>,
+    pub world_pos: Option<Ray3d>,
 }
 
 impl Default for CurrentInput {
@@ -70,7 +70,6 @@ impl EditorInputPlugin {
         current_input.pressed = pressed;
         current_input.released = released;
         
-        // info!("{}", *current_input);
         let mut locations = Vec::new();
         for (_, pointer) in pointers {
             for (camera_entity, camera, camera_transform, cam_multicam) in &cameras {
@@ -106,7 +105,6 @@ impl EditorInputPlugin {
             current_input.global_pos = None;
             current_input.world_pos = None;
         }
-        info!("{}", *current_input);
     }
 }
 
@@ -128,9 +126,9 @@ fn mouse_precedence(mouse_buttons: Res<ButtonInput<MouseButton>>) -> (Option<Mou
     let right = mouse_buttons.pressed(MouseButton::Right);
     let middle = mouse_buttons.pressed(MouseButton::Middle);
     
-    let left_released = mouse_buttons.just_pressed(MouseButton::Left);
-    let right_released = mouse_buttons.just_pressed(MouseButton::Right);
-    let middle_released = mouse_buttons.just_pressed(MouseButton::Middle);
+    let left_released = mouse_buttons.just_released(MouseButton::Left);
+    let right_released = mouse_buttons.just_released(MouseButton::Right);
+    let middle_released = mouse_buttons.just_released(MouseButton::Middle);
     
     if !left && !right && !middle {
         if left_released && !right_released && !middle_released {

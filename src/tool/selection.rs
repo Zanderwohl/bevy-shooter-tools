@@ -1,14 +1,14 @@
+use std::env::current_exe;
 use bevy::app::App;
 use bevy::math::bounding::Bounded3d;
 use bevy::prelude::*;
-
+use crate::editor::input::CurrentInput;
 
 pub struct SelectionPlugin;
 
 impl Plugin for SelectionPlugin {
     fn build(&self, app: &mut App) {
         app
-            .add_event::<SelectionEvent>()
             .init_resource::<SelectionState>()
             .add_systems(Update, (
                 Self::select,
@@ -20,15 +20,35 @@ impl Plugin for SelectionPlugin {
 
 impl SelectionPlugin {
     fn select(
-        mut selection_events: EventReader<SelectionEvent>,
         mut state: ResMut<SelectionState>,
+        current_input: Res<CurrentInput>,
+        selectables: Query<&EditorSelectable>,
+        mut ray_cast: MeshRayCast,
+        mut gizmos: Gizmos,
     ) {
-        for selection in selection_events.read() {
-            if state.selected == selection.id {
-                state.selected = None;
+        let filter = |entity| selectables.get(entity).is_ok();
+        let settings = MeshRayCastSettings::default().with_filter(&filter);
+        
+        if let Some(ray) = current_input.world_pos {
+            if let Some((hit_entity, hit_data)) = ray_cast
+                .cast_ray(ray, &settings)
+                .first() {
+                gizmos.line(ray.origin, hit_data.point, Color::srgb_u8(0, 255, 0));
+                gizmos.sphere(Isometry3d::from_translation(hit_data.point), 0.2, Color::srgb_u8(0, 255, 0));
+
+                state.hovered = Some(*hit_entity);
+                if current_input.released == Some(MouseButton::Left) {
+                    state.selected = Some(*hit_entity);
+                }
             } else {
-                state.selected = selection.id;
+                gizmos.line(ray.origin, ray.origin + ray.direction * 100.0, Color::srgb_u8(255, 0, 0));
+                state.hovered = None;
+                if current_input.released == Some(MouseButton::Left) {
+                    state.selected = None;
+                }
             }
+        } else {
+            state.hovered = None;
         }
     }
 
@@ -95,11 +115,6 @@ impl SelectionPlugin {
 pub struct EditorSelectable {
     pub id: String,
     pub bounding_box: Cuboid,
-}
-
-#[derive(Event)]
-pub struct SelectionEvent {
-    pub id: Option<Entity>,
 }
 
 #[derive(Resource, Default)]
