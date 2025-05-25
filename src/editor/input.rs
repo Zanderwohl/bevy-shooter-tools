@@ -3,6 +3,7 @@ use bevy::window::PrimaryWindow;
 use bevy_egui::EguiContexts;
 use std::fmt::Display;
 use std::panic::Location;
+use bevy::input::mouse::MouseMotion;
 use bevy::picking::pointer::{PointerId, PointerLocation};
 use bevy::tasks::futures_lite::StreamExt;
 use crate::editor::multicam::Multicam;
@@ -24,6 +25,7 @@ pub struct CurrentInput {
     pub released: Option<MouseButton>,
     pub in_camera: Option<Entity>,
     pub local_pos: Option<Vec2>,
+    pub delta_pos: Vec2,
     pub normalized_pos: Option<Vec2>,
     pub global_pos: Option<Vec2>,
     pub world_pos: Option<Ray3d>,
@@ -36,6 +38,7 @@ impl Default for CurrentInput {
             released: None,
             in_camera: None,
             local_pos: None,
+            delta_pos: Vec2::ZERO,
             normalized_pos: None,
             global_pos: None,
             world_pos: None,
@@ -58,6 +61,7 @@ impl EditorInputPlugin {
         mut current_input: ResMut<CurrentInput>,
         cameras: Query<(Entity, &Camera, &GlobalTransform, &Multicam)>,
         pointers: Query<(&PointerId, &PointerLocation)>,
+        mut evr_motion: EventReader<MouseMotion>,
     ) {
         // We don't want to grab mouse input while over egui windows or panels.
         let ctx = egui_contexts.ctx_mut();
@@ -69,7 +73,7 @@ impl EditorInputPlugin {
         let (pressed, released) = mouse_precedence(mouse_buttons);
         current_input.pressed = pressed;
         current_input.released = released;
-        
+
         let mut locations = Vec::new();
         for (_, pointer) in pointers {
             for (camera_entity, camera, camera_transform, cam_multicam) in &cameras {
@@ -104,6 +108,12 @@ impl EditorInputPlugin {
             current_input.normalized_pos = None;
             current_input.global_pos = None;
             current_input.world_pos = None;
+        }
+        
+        current_input.delta_pos = Vec2::ZERO;
+        for ev in evr_motion.read() {
+            current_input.delta_pos.x += ev.delta.x;
+            current_input.delta_pos.y += ev.delta.y;
         }
     }
 }

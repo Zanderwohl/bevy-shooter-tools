@@ -2,18 +2,15 @@ use bevy::core_pipeline::bloom::Bloom;
 use bevy::core_pipeline::tonemapping::Tonemapping;
 use bevy::diagnostic::FrameCount;
 use bevy::ecs::query::QuerySingleError;
-use bevy::input::mouse::MouseMotion;
 use bevy::prelude::*;
 use bevy::render::camera::Viewport;
-use bevy::picking::backend::ray::RayMap;
-use bevy::picking::pointer::{PointerId, PointerLocation};
+use bevy::picking::pointer::{PointerLocation};
 use bevy::render::view::RenderLayers;
 use bevy::window::{PrimaryWindow, WindowResized};
 use bevy_egui::{egui, EguiContextPass, EguiContexts};
 use bevy_vector_shapes::prelude::*;
-use crate::tool::selection::{EditorSelectable, SelectionState};
+use crate::tool::selection::{EditorSelectable};
 use crate::get;
-use crate::tool::movement::MovementEvent;
 
 pub struct MulticamPlugin {
     pub test_scene: bool,
@@ -384,7 +381,6 @@ impl MulticamPlugin {
         ui_cam: Query<(&Camera, &Camera2d), Without<Multicam>>,
         mut painter: ShapePainter,
         mut egui_contexts: EguiContexts,
-        mut movement_events: EventWriter<MovementEvent>,
     ) {
         let ctx = egui_contexts.ctx_mut();
         if ctx.is_pointer_over_area() || ctx.wants_pointer_input() {
@@ -447,17 +443,6 @@ impl MulticamPlugin {
                         }
                     }
                 }
-                
-               // if let Some(viewport) = &camera.viewport {
-                    // If mouse is in viewport, generate event.
-                    movement_events.write(MovementEvent {
-                        mouse_button: button,
-                        mouse_pos: cursor_pos_window,
-                        mouse_delta: Vec2::ZERO,
-                        camera: camera_entity,
-                        camera_translation: Default::default(),
-                    });
-                //}
             }
         }
     }
