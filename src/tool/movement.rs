@@ -8,6 +8,7 @@ pub struct MovementPlugin;
 impl Plugin for MovementPlugin {
     fn build(&self, app: &mut App) {
         app
+            .init_resource::<MovementSettings>()
             .add_systems(Update, (
                 Self::handle,
                 )
@@ -18,6 +19,7 @@ impl Plugin for MovementPlugin {
 
 impl MovementPlugin {
     fn handle(
+        movement_settings: Res<MovementSettings>,
         mouse_input: Res<CurrentMouseInput>,
         keyboard_input: Res<CurrentKeyboardInput>,
         mut cameras: Query<(Entity, &mut Transform, &Multicam, &Projection, &Camera)>,
@@ -32,6 +34,15 @@ impl MovementPlugin {
                             let delta = mouse_input.delta_pos;
                             match projection {
                                 Projection::Perspective(projection) => {
+                                    if keyboard_input.modify {
+                                        let pan_scaled_x = delta.x * movement_settings.perspective_pan;
+                                        let pan_scaled_y = delta.y * movement_settings.perspective_pan;
+
+                                        let local_x = transform.local_x();
+                                        transform.translation -= local_x * pan_scaled_x;
+                                        let local_y = transform.local_y();
+                                        transform.translation += local_y * pan_scaled_y;
+                                    }
                                     
                                 }
                                 Projection::Orthographic(projection) => {
@@ -49,6 +60,19 @@ impl MovementPlugin {
                     }
                 }
             }
+        }
+    }
+}
+
+#[derive(Resource)]
+pub struct MovementSettings {
+    perspective_pan: f32,
+}
+
+impl Default for MovementSettings {
+    fn default() -> Self {
+        Self {
+            perspective_pan: 0.1,
         }
     }
 }
