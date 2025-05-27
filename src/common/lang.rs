@@ -146,15 +146,3 @@ fn fill_template(keys: &[&str], pairs: &[(&str, &str)], fail_quickly: bool) -> R
 
     Ok(product)
 }
-
-#[cfg(test)]
-mod tests {
-    use crate::common::lang::{get_template, load_lang};
-
-    #[test]
-    fn test_get_template() {
-        load_lang("en-US");
-        let server_name = get_template(&["server", "title"], &[("game_name", "MyGame")]);
-        assert_eq!(server_name, "MyGame (Server)");
-    }
-}

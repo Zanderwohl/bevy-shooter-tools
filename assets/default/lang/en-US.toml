@@ -26,3 +26,6 @@ title = "Tools"
 select = "Select"
 move = "Move"
 room = "Room"
+
+[room.messages]
+ghost = "Room { me } is fully inside { other } and will not appear!"
