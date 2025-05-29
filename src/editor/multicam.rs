@@ -322,7 +322,9 @@ impl MulticamPlugin {
         mut state: ResMut<MulticamState>,
         mut contexts: EguiContexts,
     ) {
-        let ctx = contexts.ctx_mut();
+        let ctx = contexts.try_ctx_mut();
+        if ctx.is_none() { return; }
+        let ctx = ctx.unwrap();
         
         if !state.debug_window {
             return;

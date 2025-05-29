@@ -110,7 +110,9 @@ impl MovementPlugin {
         mut contexts: EguiContexts,
         mut settings: ResMut<MovementSettings>,
     ) {
-        let ctx = contexts.ctx_mut();
+        let ctx = contexts.try_ctx_mut();
+        if ctx.is_none() { return; }
+        let ctx = ctx.unwrap();
         
         if !settings.debug_window {
             return;

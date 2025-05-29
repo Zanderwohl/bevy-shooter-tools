@@ -82,7 +82,9 @@ impl RoomTool {
         mut contexts: EguiContexts,
         tool: Res<RoomTool>,
     ) {
-        let ctx = contexts.ctx_mut();
+        let ctx = contexts.try_ctx_mut();
+        if ctx.is_none() { return; }
+        let ctx = ctx.unwrap();
         
         if !tool.debug_window {
             return;

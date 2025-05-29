@@ -61,7 +61,9 @@ impl ToolPlugin {
         current_tool: Res<State<Tools>>,
         mut next_tool: ResMut<NextState<Tools>>,
     ) {
-        let ctx = contexts.ctx_mut();
+        let ctx = contexts.try_ctx_mut();
+        if ctx.is_none() { return; }
+        let ctx = ctx.unwrap();
 
         egui::Window::new(get!("tools.title")).show(ctx, |ui| {
            egui::Grid::new("tools").show(ui, |ui| {
