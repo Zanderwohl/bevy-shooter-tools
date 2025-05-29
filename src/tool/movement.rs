@@ -1,7 +1,10 @@
 use bevy::app::App;
 use bevy::prelude::*;
+use bevy::window::{CursorGrabMode, PrimaryWindow};
+use bevy_egui::{egui, EguiContextPass, EguiContexts};
 use crate::editor::input::{CurrentKeyboardInput, CurrentMouseInput};
 use crate::editor::multicam::Multicam;
+use crate::get;
 
 pub struct MovementPlugin;
 
@@ -13,46 +16,45 @@ impl Plugin for MovementPlugin {
                 Self::handle,
                 )
             )
+            .add_systems(EguiContextPass, Self::debug_window)
         ;
     }
 }
 
 impl MovementPlugin {
     fn handle(
+        mut window: Query<&mut Window, With<PrimaryWindow>>,
         movement_settings: Res<MovementSettings>,
         mouse_input: Res<CurrentMouseInput>,
         keyboard_input: Res<CurrentKeyboardInput>,
-        mut cameras: Query<(Entity, &mut Transform, &Multicam, &Projection, &Camera)>,
+        mut cameras: Query<(Entity, &mut Transform, &GlobalTransform, &Multicam, &Projection, &Camera)>,
     ) {
+        let mut window = window.single_mut().unwrap();
+        
+        if mouse_input.started_in_camera.is_none() {
+            window.cursor_options.grab_mode = CursorGrabMode::None;
+            window.cursor_options.visible = true;
+        }
+
         // For now, let's make middle click orbit for 3d cams and turn for 2d cam
         // and shift + middle click as pan
         if let Some(cam_id) = mouse_input.started_in_camera {
             if let Some(button) = mouse_input.pressed {
                 if button == MouseButton::Middle {
-                    for (entity, mut transform, multicam, projection, camera) in &mut cameras {
+                    // grab and hold mouse
+                    window.cursor_options.grab_mode = CursorGrabMode::Locked;
+                    window.cursor_options.visible = false;
+
+                    for (entity, mut transform, global_transform, multicam, projection, camera) in &mut cameras {
                         if cam_id == entity {
                             let delta = mouse_input.delta_pos;
                             match projection {
                                 Projection::Perspective(projection) => {
-                                    if keyboard_input.modify {
-                                        let pan_scaled_x = delta.x * movement_settings.perspective_pan;
-                                        let pan_scaled_y = delta.y * movement_settings.perspective_pan;
-
-                                        let local_x = transform.local_x();
-                                        transform.translation -= local_x * pan_scaled_x;
-                                        let local_y = transform.local_y();
-                                        transform.translation += local_y * pan_scaled_y;
-                                    }
+                                    Self::perspective_move(&mut transform, global_transform, delta, &movement_settings, &keyboard_input);
                                     
                                 }
                                 Projection::Orthographic(projection) => {
-                                    let pan_scaled_x = delta.x * projection.scale;
-                                    let pan_scaled_y = delta.y * projection.scale;
-                                    
-                                    let local_x = transform.local_x();
-                                    transform.translation -= local_x * pan_scaled_x;
-                                    let local_y = transform.local_y();
-                                    transform.translation += local_y * pan_scaled_y;
+                                    Self::ortho_move(&mut transform, delta, projection);
                                 }
                                 Projection::Custom(_) => {}
                             }
@@ -62,17 +64,82 @@ impl MovementPlugin {
             }
         }
     }
+
+    fn perspective_move(transform: &mut Mut<Transform>, global_transform: &GlobalTransform, delta: Vec2, movement_settings: &Res<MovementSettings>, keyboard_input: &Res<CurrentKeyboardInput>) {
+        if keyboard_input.modify {
+            let pan_scaled_x = delta.x * movement_settings.perspective_pan;
+            let pan_scaled_y = delta.y * movement_settings.perspective_pan;
+
+            let local_x = transform.local_x();
+            transform.translation -= local_x * pan_scaled_x;
+            let local_y = transform.local_y();
+            transform.translation += local_y * pan_scaled_y;
+        } else {
+            let pi_halves = std::f32::consts::FRAC_PI_2;
+            let pi_fourths = std::f32::consts::PI / 2.0;
+            let max = pi_fourths * 0.95;
+            let min = -pi_fourths * 0.95;
+            
+            transform.rotate_y(-delta.x * movement_settings.perspective_rotate);
+            transform.rotate_local_x(-delta.y * movement_settings.perspective_rotate);
+
+
+            let (ry, _, _) = transform.rotation.to_euler(EulerRot::YXZ);
+            let local_dx = keyboard_input.backward() * movement_settings.perspective_speed;
+            let local_dz = keyboard_input.right() * movement_settings.perspective_speed;
+            let dx = local_dx * f32::sin(ry) + local_dz * f32::sin(ry + pi_halves);
+            let dz = local_dx * f32::cos(ry) + local_dz * f32::cos(ry + pi_halves);
+            
+            let dy = keyboard_input.up() * movement_settings.perspective_speed;
+
+            transform.translation += Vec3::new(dx, dy, dz);
+        }
+    }
+
+    fn ortho_move(transform: &mut Mut<Transform>, delta: Vec2, projection: &OrthographicProjection) {
+        let pan_scaled_x = delta.x * projection.scale;
+        let pan_scaled_y = delta.y * projection.scale;
+
+        let local_x = transform.local_x();
+        transform.translation -= local_x * pan_scaled_x;
+        let local_y = transform.local_y();
+        transform.translation += local_y * pan_scaled_y;
+    }
+    
+    fn debug_window(
+        mut contexts: EguiContexts,
+        mut settings: ResMut<MovementSettings>,
+    ) {
+        let ctx = contexts.ctx_mut();
+        
+        if !settings.debug_window {
+            return;
+        }
+        
+        egui::Window::new(get!("debug.movement.title")).show(ctx, |ui| {
+            ui.heading(get!("debug.movement.perspective.title"));
+            ui.add(egui::Slider::new(&mut settings.perspective_pan, 0.0..=1.0).text(get!("debug.movement.perspective.pan")));
+            ui.add(egui::Slider::new(&mut settings.perspective_rotate, 0.0..=0.1).text(get!("debug.movement.perspective.rotate")));
+            ui.add(egui::Slider::new(&mut settings.perspective_speed, 0.0..=10.0).text(get!("debug.movement.perspective.speed")));
+        });
+    }
 }
 
 #[derive(Resource)]
 pub struct MovementSettings {
+    debug_window: bool,
     perspective_pan: f32,
+    perspective_rotate: f32,
+    perspective_speed: f32,
 }
 
 impl Default for MovementSettings {
     fn default() -> Self {
         Self {
+            debug_window: true,
             perspective_pan: 0.1,
+            perspective_rotate: 0.01,
+            perspective_speed: 1.0,
         }
     }
 }

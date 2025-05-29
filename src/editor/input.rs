@@ -55,6 +55,83 @@ impl Default for CurrentMouseInput {
 #[derive(Resource, Default)]
 pub struct CurrentKeyboardInput {
     pub modify: bool,
+    forward: bool,
+    left: bool,
+    right: bool,
+    backward: bool,
+    up: bool,
+    down: bool,
+}
+
+impl CurrentKeyboardInput {
+    pub fn forward(&self) -> f32 {
+        if self.forward && !self.backward {
+            1.0
+        } else if self.backward && !self.forward {
+            -1.0
+        } else {
+            0.0
+        }
+    }
+    
+    pub fn left(&self) -> f32 {
+        if self.left && !self.right {
+            1.0
+        } else if self.right && !self.left {
+            -1.0
+        } else {
+            0.0
+        }
+    }
+    
+    pub fn right(&self) -> f32 {
+        if self.right && !self.left {
+            1.0
+        } else if self.left && !self.right {
+            -1.0
+        } else {
+            0.0
+        }
+    }
+    
+    pub fn backward(&self) -> f32 {
+        if self.backward && !self.forward {
+            1.0
+        } else if self.forward && !self.backward {
+            -1.0
+        } else {
+            0.0
+        }
+    }
+    
+    pub fn up(&self) -> f32 {
+        if self.up && !self.down {
+            1.0
+        } else if self.down && !self.up {
+            -1.0
+        } else {
+            0.0
+        }
+    }
+    
+    pub fn down(&self) -> f32 {
+        if self.down && !self.up {
+            1.0
+        } else if self.up && !self.down {
+            -1.0
+        } else {
+            0.0
+        }
+    }
+
+    pub fn update(&mut self, keys: &Res<ButtonInput<KeyCode>>) {
+        self.forward = keys.pressed(KeyCode::KeyW);
+        self.left = keys.pressed(KeyCode::KeyA);
+        self.right = keys.pressed(KeyCode::KeyD);
+        self.backward = keys.pressed(KeyCode::KeyS);
+        self.up = keys.pressed(KeyCode::KeyQ);
+        self.down = keys.pressed(KeyCode::KeyE);
+    }
 }
 
 impl Display for CurrentMouseInput {
@@ -140,6 +217,7 @@ impl EditorInputPlugin {
         keys: Res<ButtonInput<KeyCode>>,
     ) {
         current_input.modify = keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight);
+        current_input.update(&keys);
     }
 }
 

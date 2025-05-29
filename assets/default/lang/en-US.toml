@@ -21,6 +21,13 @@ box = "Viewport Box"
 mouseover = "Mouseover Boxes"
 probe = "Mouse Probe"
 
+[debug.movement]
+title = "Camera Movement"
+perspective.title = "Perspective Camera Settings"
+perspective.pan = "Perspective camera pan factor"
+perspective.rotate = "Perspective camera rotate factor"
+perspective.speed = "Perspective camera speed"
+
 [tools]
 title = "Tools"
 select = "Select"
