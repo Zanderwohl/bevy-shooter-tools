@@ -94,8 +94,8 @@ impl MulticamPlugin {
 
         let dist = 5.0;
         let cameras = [
-            //(get!("viewport.free"), Transform::from_xyz(-2.5, 4.5, 9.0).looking_at(Vec3::ZERO, Vec3::Y), &perspective),
-            (get!("viewport.free"), Transform::from_xyz(0.0, 1.5, 1.0).looking_at(Vec3::ZERO, Vec3::Y), &perspective),
+            (get!("viewport.free"), Transform::from_xyz(-2.5, 4.5, 9.0).looking_at(Vec3::ZERO, Vec3::Y), &perspective),
+            //(get!("viewport.free"), Transform::from_xyz(0.0, 1.5, 1.0).looking_at(Vec3::ZERO, Vec3::Y), &perspective),
             (get!("viewport.front"), Transform::from_xyz(dist, 0.0, 0.0).looking_at(Vec3::ZERO, Vec3::Y), &orthographic),
             (get!("viewport.top"), Transform::from_xyz(0.0, dist, 0.0).looking_at(Vec3::ZERO, -Vec3::X), &orthographic),
             (get!("viewport.right"), Transform::from_xyz(0.0, 0.0, dist).looking_at(Vec3::ZERO, Vec3::Y), &orthographic),
@@ -213,7 +213,7 @@ impl MulticamPlugin {
         ));
     }
 
-    fn draw_camera_gizmos(
+    pub fn draw_camera_gizmos(
         cameras: Query<(&Camera, &Multicam, &GlobalTransform, &Projection)>,
         mut gizmos: Gizmos,
     ) {

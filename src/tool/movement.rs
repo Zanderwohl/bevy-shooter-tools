@@ -139,7 +139,7 @@ impl Default for MovementSettings {
             debug_window: true,
             perspective_pan: 0.1,
             perspective_rotate: 0.01,
-            perspective_speed: 1.0,
+            perspective_speed: 0.2,
         }
     }
 }
