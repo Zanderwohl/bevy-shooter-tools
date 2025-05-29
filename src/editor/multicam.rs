@@ -219,12 +219,11 @@ impl MulticamPlugin {
         mut gizmos: Gizmos,
     ) {
         let color = Color::srgb_u8(255, 0 ,0);
-        let s = 0.0;
         for (camera, multicam, camera_tfm, projection) in cameras {
-            let s = match projection {
-                Projection::Perspective(_) => -1.0,
-                Projection::Orthographic(_) => 0.0,
-                _ => 0.0,
+            let (s, t) = match projection {
+                Projection::Perspective(_) => (-1.0, 1.5),
+                Projection::Orthographic(_) => (0.0, 1.0),
+                _ => (0.0, 0.0),
             };
             
             // gizmos.sphere(Isometry3d::from_translation(hit_data.point), 0.2, Color::srgb_u8(0, 255, 0));
@@ -232,15 +231,18 @@ impl MulticamPlugin {
             let b = camera.ndc_to_world(camera_tfm, Vec3::new(1.05, -1.05, 1.0));
             let c = camera.ndc_to_world(camera_tfm, Vec3::new(-1.05, 1.05, 1.0));
             let d = camera.ndc_to_world(camera_tfm, Vec3::new(1.05, 1.05, 1.0));
-            let e = camera.ndc_to_world(camera_tfm, Vec3::new(-0.2, 1.1, 1.0));
-            let f = camera.ndc_to_world(camera_tfm, Vec3::new(0.2, 1.1, 1.0));
-            let g = camera.ndc_to_world(camera_tfm, Vec3::new(0.0, 1.4, 1.0));
+            let e = camera.ndc_to_world(camera_tfm, Vec3::new(-0.4 * t, 1.1, 1.0));
+            let f = camera.ndc_to_world(camera_tfm, Vec3::new(0.4 * t, 1.1, 1.0));
+            let g = camera.ndc_to_world(camera_tfm, Vec3::new(0.0 * t, 1.4 * t, 1.0));
             match (a, b, c, d, e, f, g) {
                 (Some(a), Some(b), Some(c), Some(d), Some(e), Some(f), Some(g)) => {
                     let a = a.lerp(camera_tfm.translation(), s);
                     let b = b.lerp(camera_tfm.translation(), s);
                     let c = c.lerp(camera_tfm.translation(), s);
                     let d = d.lerp(camera_tfm.translation(), s);
+                    let e = e.lerp(camera_tfm.translation(), s);
+                    let f = f.lerp(camera_tfm.translation(), s);
+                    let g = g.lerp(camera_tfm.translation(), s);
 
                     gizmos.line(a, b, color);
                     gizmos.line(a, c, color);
