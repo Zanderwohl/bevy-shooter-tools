@@ -62,8 +62,9 @@ impl Plugin for MulticamPlugin {
             .add_systems(Update, (
                 Self::set_camera_viewports,
                 Self::debug_boxes,
-                Self::draw_camera_gizmos,
             ))
+            // Global transforms are propagated from transforms during PostUpdate, so we need to draw the camera after that.
+            .add_systems(PostUpdate, Self::draw_camera_gizmos.after(TransformSystem::TransformPropagate))
             .add_systems(EguiContextPass, Self::debug_window)
         ;
     }
