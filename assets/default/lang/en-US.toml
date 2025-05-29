@@ -27,6 +27,9 @@ perspective.title = "Perspective Camera Settings"
 perspective.pan = "Perspective camera pan factor"
 perspective.rotate = "Perspective camera rotate factor"
 perspective.speed = "Perspective camera speed"
+perspective.scroll = "Perspectiva camera scroll speed"
+orthographic.title = "Orthographic Camera Settings"
+orthographic.scroll = "Orthographic camera scroll speed"
 
 [tools]
 title = "Tools"
