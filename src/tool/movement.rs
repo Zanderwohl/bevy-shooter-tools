@@ -67,7 +67,7 @@ impl MovementPlugin {
                                     }
                                 }
                                 Projection::Orthographic(projection) => {
-                                    Self::ortho_move(&mut transform, delta, projection);
+                                    Self::ortho_move(&mut transform, delta, projection, &settings, &keyboard_input);
 
                                     for ev in evr_scroll.read() {
                                         match ev.unit {
@@ -120,7 +120,9 @@ impl MovementPlugin {
         }
     }
 
-    fn ortho_move(transform: &mut Mut<Transform>, delta: Vec2, projection: &OrthographicProjection) {
+    fn ortho_move(transform: &mut Mut<Transform>, delta: Vec2, projection: &OrthographicProjection, movement_settings: &Res<MovementSettings>, keyboard_input: &Res<CurrentKeyboardInput>) {
+        let pi_halves = std::f32::consts::FRAC_PI_2;
+        
         let pan_scaled_x = delta.x * projection.scale;
         let pan_scaled_y = delta.y * projection.scale;
 
@@ -128,6 +130,16 @@ impl MovementPlugin {
         transform.translation -= local_x * pan_scaled_x;
         let local_y = transform.local_y();
         transform.translation += local_y * pan_scaled_y;
+
+        let (ry, _, _) = transform.rotation.to_euler(EulerRot::YXZ);
+        let local_dx = keyboard_input.backward() * movement_settings.orthographic_speed;
+        let local_dz = keyboard_input.right() * movement_settings.orthographic_speed;
+        let dx = local_dx * f32::sin(ry) + local_dz * f32::sin(ry + pi_halves);
+        let dz = local_dx * f32::cos(ry) + local_dz * f32::cos(ry + pi_halves);
+
+        let dy = keyboard_input.up() * movement_settings.orthographic_speed;
+
+        transform.translation += Vec3::new(dx, dy, dz);
     }
     
     fn debug_window(
@@ -162,6 +174,7 @@ pub struct MovementSettings {
     perspective_rotate: f32,
     perspective_speed: f32,
     perspective_scroll: f32,
+    orthographic_speed: f32,
     orthographic_scroll: f32,
 }
 
@@ -173,6 +186,7 @@ impl Default for MovementSettings {
             perspective_rotate: 0.01,
             perspective_speed: 0.2,
             perspective_scroll: 0.5,
+            orthographic_speed: 0.2,
             orthographic_scroll: 0.5,
         }
     }
