@@ -4,6 +4,7 @@ use bevy::math::bounding::Bounded3d;
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use crate::editor::input::CurrentMouseInput;
+use crate::tool::Tools;
 
 pub struct SelectionPlugin;
 
@@ -12,7 +13,7 @@ impl Plugin for SelectionPlugin {
         app
             .init_resource::<SelectionState>()
             .add_systems(Update, (
-                Self::select,
+                Self::select.run_if(in_state(Tools::Select)),
                 Self::draw_bounds,
             ))
         ;
