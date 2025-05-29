@@ -1,4 +1,4 @@
-use bevy::app::App;
+ use bevy::app::App;
 use bevy::prelude::*;
 use bevy::window::{CursorGrabMode, PrimaryWindow};
 use bevy_egui::{egui, EguiContextPass, EguiContexts};
@@ -136,7 +136,7 @@ pub struct MovementSettings {
 impl Default for MovementSettings {
     fn default() -> Self {
         Self {
-            debug_window: true,
+            debug_window: false,
             perspective_pan: 0.1,
             perspective_rotate: 0.01,
             perspective_speed: 0.2,

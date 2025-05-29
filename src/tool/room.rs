@@ -1,14 +1,103 @@
 use bevy::app::App;
 use bevy::prelude::*;
-use crate::get;
+use bevy_egui::{egui, EguiContextPass, EguiContexts};
+use crate::{get, get_with_debug};
 
 pub struct RoomPlugin;
 
 impl Plugin for RoomPlugin {
     fn build(&self, app: &mut App) {
         app
-        
+            .init_resource::<RoomTool>()
+            .add_systems(EguiContextPass, RoomTool::debug_window)
         ;
+    }
+}
+
+#[derive(Resource)]
+struct RoomTool {
+    debug_window: bool,
+    last_min: Vec3,
+    last_max: Vec3,
+    active_min: Option<Vec3>,
+    active_max: Option<Vec3>,
+}
+
+impl Default for RoomTool {
+    fn default() -> Self {
+        Self {
+            debug_window: true,
+            last_min: Vec3::ZERO,
+            last_max: Vec3::new(10., 10., 10.),
+            active_min: None,
+            active_max: None,
+        }
+    }
+}
+
+impl RoomTool {
+    fn clear(&mut self) {
+        self.active_min = None;
+        self.active_max = None;
+    }
+    
+    fn create(&mut self) -> Option<Room> {
+        let room = match (self.active_min, self.active_max) {
+            (Some(min), Some(max)) => Some(Room::new(min, max)),
+            _ => None,
+        };
+        if let Some(active_min) = self.active_min {
+            self.last_min = active_min;
+        }
+        if let Some(active_max) = self.active_max {
+            self.last_max = active_max;
+        }
+        self.clear();
+        room
+    }
+    
+    fn set_min(&mut self, x: Option<f32>, y: Option<f32>, z: Option<f32>) {
+        let min = Vec3::new(
+            x.unwrap_or(self.last_min.x),
+            y.unwrap_or(self.last_min.y),
+            z.unwrap_or(self.last_min.z),
+        );
+        self.active_min = Some(min);
+    }
+    
+    fn set_max(&mut self, x: Option<f32>, y: Option<f32>, z: Option<f32>) {
+        if self.active_min.is_none() {
+            self.active_min = Some(self.last_min);
+        }
+        
+        let max = Vec3::new(
+            x.unwrap_or(self.last_max.x),
+            y.unwrap_or(self.last_max.y),
+            z.unwrap_or(self.last_max.z),
+        );
+        self.active_max = Some(max);
+    }
+    
+    fn debug_window(
+        mut contexts: EguiContexts,
+        tool: Res<RoomTool>,
+    ) {
+        let ctx = contexts.ctx_mut();
+        
+        if !tool.debug_window {
+            return;
+        }
+        
+        let active_min = tool.active_min.map(|m| format!("{}", m)).unwrap_or("None".to_owned());
+        let active_max = tool.active_max.map(|m| format!("{}", m)).unwrap_or("None".to_owned());
+        
+        egui::Window::new(get!("debug.room.title")).show(ctx, |ui| {
+            ui.heading(get!("debug.room.state"));
+            ui.label(get!("debug.room.last_min", "x", tool.last_min));
+            ui.label(get!("debug.room.last_max", "x", tool.last_max));
+            ui.label(get!("debug.room.active_min", "x", active_min));
+            ui.label(get!("debug.room.active_max", "x", active_max));
+        });
     }
 }
 

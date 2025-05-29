@@ -36,3 +36,11 @@ room = "Room"
 
 [room.messages]
 ghost = "Room { me } is fully inside { other } and will not appear!"
+
+[debug.room]
+title = "Room Tool Debug"
+state = "Current Tool State"
+last_min = "Last min: { x }"
+last_max = "Last max: { x }"
+active_min = "Active min: { x }"
+active_max = "Active max: { x }"

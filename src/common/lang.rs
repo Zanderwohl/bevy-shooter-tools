@@ -123,6 +123,18 @@ macro_rules! get {
     };
 }
 
+#[macro_export]
+macro_rules! get_with_debug {
+    ($key:expr) => {
+        $crate::common::lang::get_parsed(&$key)
+    };
+    ($key:expr, $($var:expr, $val:expr),*) => {
+        $crate::common::lang::get_template_parsed(&$key, &[
+            $(($var, &format!("{:?}", $val))),*
+        ])
+    };
+}
+
 fn fill_template(keys: &[&str], pairs: &[(&str, &str)], fail_quickly: bool) -> Result<String, String> {
     let template = get_maybe(keys).ok_or(format!("Failed to find value for key {:?}", keys))?;
 
