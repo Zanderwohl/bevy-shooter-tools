@@ -28,7 +28,7 @@ impl MovementPlugin {
         settings: Res<MovementSettings>,
         mouse_input: Res<CurrentMouseInput>,
         keyboard_input: Res<CurrentKeyboardInput>,
-        mut cameras: Query<(Entity, &mut Transform, &GlobalTransform, &Multicam, &Projection, &Camera)>,
+        mut cameras: Query<(Entity, &mut Transform, &GlobalTransform, &Multicam, &mut Projection, &Camera)>,
         mut evr_scroll: EventReader<MouseWheel>,
     ) {
         let mut window = window.single_mut().unwrap();
@@ -47,14 +47,14 @@ impl MovementPlugin {
                     window.cursor_options.grab_mode = CursorGrabMode::Locked;
                     window.cursor_options.visible = false;
 
-                    for (entity, mut transform, global_transform, multicam, projection, camera) in &mut cameras {
+                    for (entity, mut transform, global_transform, multicam, mut projection, camera) in &mut cameras {
                         if cam_id == entity {
                             let delta = mouse_input.delta_pos;
                             let forward = transform.forward();
-                            match projection {
+                            match projection.into_inner() {
                                 Projection::Perspective(projection) => {
                                     Self::perspective_move(&mut transform, global_transform, delta, &settings, &keyboard_input);
-                                    
+
                                     for ev in evr_scroll.read() {
                                         match ev.unit {
                                             MouseScrollUnit::Line => {
@@ -67,16 +67,22 @@ impl MovementPlugin {
                                     }
                                 }
                                 Projection::Orthographic(projection) => {
-                                    Self::ortho_move(&mut transform, delta, projection, &settings, &keyboard_input);
+                                    Self::ortho_move(&mut transform, delta, &projection, &settings, &keyboard_input);
 
                                     for ev in evr_scroll.read() {
                                         match ev.unit {
                                             MouseScrollUnit::Line => {
-                                                transform.translation += forward * settings.orthographic_scroll * ev.y;
+                                                projection.scale -= settings.orthographic_scroll * ev.y;
                                             }
                                             MouseScrollUnit::Pixel => {
-                                                transform.translation += forward * settings.orthographic_scroll * ev.y;
+                                                projection.scale -= settings.orthographic_scroll * ev.y;
                                             }
+                                        }
+                                        if projection.scale < 0.001 {
+                                            projection.scale = 0.001;
+                                        }
+                                        if projection.scale > 0.1 {
+                                            projection.scale = 0.1;
                                         }
                                     }
                                 }
@@ -122,7 +128,7 @@ impl MovementPlugin {
 
     fn ortho_move(transform: &mut Mut<Transform>, delta: Vec2, projection: &OrthographicProjection, movement_settings: &Res<MovementSettings>, keyboard_input: &Res<CurrentKeyboardInput>) {
         let pi_halves = std::f32::consts::FRAC_PI_2;
-        
+
         let pan_scaled_x = delta.x * projection.scale;
         let pan_scaled_y = delta.y * projection.scale;
 
@@ -160,7 +166,7 @@ impl MovementPlugin {
             ui.add(egui::Slider::new(&mut settings.perspective_rotate, 0.0..=0.1).text(get!("debug.movement.perspective.rotate")));
             ui.add(egui::Slider::new(&mut settings.perspective_speed, 0.0..=10.0).text(get!("debug.movement.perspective.speed")));
             ui.add(egui::Slider::new(&mut settings.perspective_scroll, 0.0..=1.0).text(get!("debug.movement.perspective.scroll")));
-            
+
             ui.heading(get!("debug.movement.orthographic.title"));
             ui.add(egui::Slider::new(&mut settings.orthographic_scroll, 0.0..=1.0).text(get!("debug.movement.orthographic.scroll")));
         });
@@ -187,7 +193,7 @@ impl Default for MovementSettings {
             perspective_speed: 0.2,
             perspective_scroll: 0.5,
             orthographic_speed: 0.2,
-            orthographic_scroll: 0.5,
+            orthographic_scroll: 0.01,
         }
     }
 }
