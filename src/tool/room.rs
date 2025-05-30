@@ -17,7 +17,9 @@ impl Plugin for RoomPlugin {
             .add_systems(Update, (
                 RoomTool::interface,
                 RoomTool::draw_active,
+                RoomTool::draw_handles,
                 ).run_if(in_state(Tools::Room)))
+            .add_systems(OnExit(Tools::Room), RoomTool::despawn_handles)
         ;
     }
 }
@@ -31,6 +33,8 @@ struct RoomTool {
     last_max: Vec3,
     active_min: Option<Vec3>,
     active_max: Option<Vec3>,
+    handles_active: bool,
+    handle_stuff: Option<(Handle<Mesh>, Handle<StandardMaterial>)>,
 }
 
 impl Default for RoomTool {
@@ -43,6 +47,8 @@ impl Default for RoomTool {
             last_max: Vec3::new(10., 10., 10.),
             active_min: None,
             active_max: None,
+            handles_active: false,
+            handle_stuff: None,
         }
     }
 }
@@ -177,6 +183,90 @@ impl RoomTool {
             _ => {}
         }
     }
+
+    fn centroid(&self) -> Option<Vec3> {
+        match (self.active_min, self.active_max) {
+            (Some(min), Some(max)) => Some((max + min) / 2.0),
+            _ => None,
+        }
+    }
+
+    fn size(&self) -> Vec3 {
+        match (self.active_min, self.active_max) {
+            (Some(min), Some(max)) => max - min,
+            _ => Vec3::ZERO,
+        }
+    }
+
+    fn face_centers(&self) -> Vec<Vec3> {
+        let mut face_centers: Vec<Vec3> = Vec::new();
+        self.centroid().map(|centroid| {
+            let half_size = self.size() / 2.0;
+
+            face_centers.push(Vec3::new(centroid.x + half_size.x, centroid.y, centroid.z));
+            face_centers.push(Vec3::new(centroid.x - half_size.x, centroid.y, centroid.z));
+
+            face_centers.push(Vec3::new(centroid.x, centroid.y + half_size.y, centroid.z));
+            face_centers.push(Vec3::new(centroid.x, centroid.y - half_size.y, centroid.z));
+
+            face_centers.push(Vec3::new(centroid.x, centroid.y, centroid.z + half_size.z));
+            face_centers.push(Vec3::new(centroid.x, centroid.y, centroid.z - half_size.z));
+        });
+        face_centers
+    }
+
+    fn draw_handles(
+        handles: Query<Entity, With<RoomToolHandle>>,
+        mut tool: ResMut<RoomTool>,
+        mut gizmos: Gizmos,
+        mut commands: Commands,
+        mut meshes: ResMut<Assets<Mesh>>,
+        mut materials: ResMut<Assets<StandardMaterial>>,
+    ) {
+        let color = Color::srgb_u8(200, 255, 200);
+        let face_centers = tool.face_centers();
+        for center in &face_centers {
+           //  gizmos.sphere(center, 0.3, color);
+        }
+        
+        if let (Some(min), Some(max)) = (tool.active_min, tool.active_max) {
+            // spawn handles
+            if !tool.handles_active {
+                tool.handles_active = true;
+                for center in &face_centers {
+                    if tool.handle_stuff.is_none() {
+                        let mesh = meshes.add(Cuboid::new(0.3, 0.3, 0.3));
+                        let material = materials.add(Color::srgb_u8(200, 255, 200));
+                        tool.handle_stuff = Some((mesh, material))
+                    }
+                    
+                    match &tool.handle_stuff {
+                        Some((mesh, material)) => {
+                            commands.spawn((
+                                RoomToolHandle,
+                                Mesh3d(mesh.clone()),
+                                MeshMaterial3d(material.clone()),
+                                Transform::from_translation(*center),
+                            ));
+                        }
+                        _ => panic!("{}", get!("room.missing_material"))
+                    }
+                    
+                }
+            }
+        }
+        
+        // Despawn handles as appropriate
+        if tool.active_min.is_none() || tool.active_max.is_none() {
+            tool.handles_active = false;
+            crate::common::systems::despawn_entities_with::<RoomToolHandle>(commands, handles);
+        }
+    }
+    
+    fn despawn_handles(handles: Query<Entity, With<RoomToolHandle>>, mut commands: Commands, mut tool: ResMut<RoomTool>) {
+        crate::common::systems::despawn_entities_with::<RoomToolHandle>(commands, handles);
+        tool.handles_active = false;
+    }
     
     fn debug_window(
         mut contexts: EguiContexts,
@@ -205,6 +295,9 @@ impl RoomTool {
         });
     }
 }
+
+#[derive(Component)]
+pub struct RoomToolHandle;
 
 #[derive(Component)]
 pub struct Room {
