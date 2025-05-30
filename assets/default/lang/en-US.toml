@@ -37,6 +37,16 @@ select = "Select"
 move = "Move"
 room = "Room"
 
+[bakes]
+title = "Bake Operations"
+intersections = "Room Intersections"
+
+[show]
+title = "Show/Hide"
+cameras = "Cameras"
+ortho_cameras = "Orthographic Cameras"
+perspective_cameras = "Perspective Cameras"
+
 [room.messages]
 ghost = "Room { me } is fully inside { other } and will not appear!"
 
@@ -47,3 +57,6 @@ last_min = "Last min: { x }"
 last_max = "Last max: { x }"
 active_min = "Active min: { x }"
 active_max = "Active max: { x }"
+show_points = "Show points"
+show_cursor = "Show 3D cursor"
+invalid_cursor = "Cursor is in an invalid state!"

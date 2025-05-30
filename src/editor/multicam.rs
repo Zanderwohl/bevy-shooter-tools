@@ -25,6 +25,8 @@ pub struct MulticamState {
     pub debug_viewport_box: bool,
     pub debug_mouseover_boxes: bool,
     pub debug_mouse_circle: bool,
+    pub draw_ortho_cameras: bool,
+    pub draw_perspective_cameras: bool,
 }
 
 #[derive(Component)]
@@ -32,6 +34,15 @@ pub struct Multicam {
     pub name: String,
     pub screen_pos: UVec2,
     pub id: u32,
+    pub axis: CameraAxis,
+}
+
+#[derive(PartialEq, Clone, Copy, Eq)]
+pub enum CameraAxis {
+    None,
+    X,
+    Y,
+    Z,
 }
 
 #[derive(Component)]
@@ -47,6 +58,8 @@ impl Default for MulticamState {
             debug_mouseover_boxes: false,
             debug_mouse_circle: false,
             debug_window: false,
+            draw_ortho_cameras: false,
+            draw_perspective_cameras: true,
         }
     }
 }
@@ -95,11 +108,11 @@ impl MulticamPlugin {
 
         let dist = 5.0;
         let cameras = [
-            (get!("viewport.free"), Transform::from_xyz(-2.5, 4.5, 9.0).looking_at(Vec3::ZERO, Vec3::Y), &perspective),
+            (get!("viewport.free"), Transform::from_xyz(-2.5, 4.5, 9.0).looking_at(Vec3::ZERO, Vec3::Y), &perspective, CameraAxis::None),
             //(get!("viewport.free"), Transform::from_xyz(0.0, 1.5, 1.0).looking_at(Vec3::ZERO, Vec3::Y), &perspective),
-            (get!("viewport.front"), Transform::from_xyz(dist, 0.0, 0.0).looking_at(Vec3::ZERO, Vec3::Y), &orthographic),
-            (get!("viewport.top"), Transform::from_xyz(0.0, dist, 0.0).looking_at(Vec3::ZERO, -Vec3::X), &orthographic),
-            (get!("viewport.right"), Transform::from_xyz(0.0, 0.0, dist).looking_at(Vec3::ZERO, Vec3::Y), &orthographic),
+            (get!("viewport.front"), Transform::from_xyz(dist, 0.0, 0.0).looking_at(Vec3::ZERO, Vec3::Y), &orthographic, CameraAxis::X),
+            (get!("viewport.top"), Transform::from_xyz(0.0, dist, 0.0).looking_at(Vec3::ZERO, -Vec3::X), &orthographic, CameraAxis::Y),
+            (get!("viewport.right"), Transform::from_xyz(0.0, 0.0, dist).looking_at(Vec3::ZERO, Vec3::Y), &orthographic, CameraAxis::Z),
         ];
         let cameras_len = cameras.len();
 
@@ -119,7 +132,7 @@ impl MulticamPlugin {
             },*/
         ));
 
-        for (idx, (camera_name, camera_pos, projection)) in cameras.into_iter().enumerate() {
+        for (idx, (camera_name, camera_pos, projection, axis)) in cameras.into_iter().enumerate() {
             let camera = commands
                 .spawn((
                     Camera3d::default(),
@@ -135,6 +148,7 @@ impl MulticamPlugin {
                         name: camera_name.to_string(),
                         screen_pos: UVec2::new((idx % 2) as u32, (idx / 2) as u32),
                         id: idx as u32,
+                        axis,
                     },
                     projection.clone(),
                 ))
@@ -215,18 +229,24 @@ impl MulticamPlugin {
     }
 
     pub fn draw_camera_gizmos(
+        state: Res<MulticamState>,
         cameras: Query<(&Camera, &Multicam, &GlobalTransform, &Projection)>,
         mut gizmos: Gizmos,
     ) {
         let color = Color::srgb_u8(255, 0 ,0);
-        for (camera, multicam, camera_tfm, projection) in cameras {
+        for (camera, _, camera_tfm, projection) in cameras {
+            match projection {
+                Projection::Perspective(_) => if !state.draw_perspective_cameras { continue; }
+                Projection::Orthographic(_) => if !state.draw_ortho_cameras { continue; }
+                Projection::Custom(_) => { continue; }
+            }
+            
             let (s, t) = match projection {
                 Projection::Perspective(_) => (-1.0, 1.5),
                 Projection::Orthographic(_) => (0.0, 1.0),
                 _ => (0.0, 0.0),
             };
             
-            // gizmos.sphere(Isometry3d::from_translation(hit_data.point), 0.2, Color::srgb_u8(0, 255, 0));
             let a = camera.ndc_to_world(camera_tfm, Vec3::new(-1.05, -1.05, 1.0));
             let b = camera.ndc_to_world(camera_tfm, Vec3::new(1.05, -1.05, 1.0));
             let c = camera.ndc_to_world(camera_tfm, Vec3::new(-1.05, 1.05, 1.0));
@@ -271,12 +291,14 @@ impl MulticamPlugin {
         frames: Res<FrameCount>,
     ) {
         for resize_event in resize_events.read() {
-            let window = windows.get(resize_event.window).unwrap();
-            Self::calculate_resize(&mut cameras, &state, window);
+            if let Ok(window) = windows.get(resize_event.window) {
+                Self::calculate_resize(&mut cameras, &state, window);
+            }
         }
         if state.is_changed() {
-            let window = windows.single().unwrap();
-            Self::calculate_resize(&mut cameras, &state, window);
+            if let Ok(window) = windows.single() {
+                Self::calculate_resize(&mut cameras, &state, window);
+            }
         }
         if frames.0 < 3 {
             let window = windows.single().unwrap();
@@ -386,9 +408,12 @@ impl MulticamPlugin {
         cameras_q: Query<(Entity, &Camera, &GlobalTransform, &Multicam)>,
         ui_cam: Query<(&Camera, &Camera2d), Without<Multicam>>,
         mut painter: ShapePainter,
-        mut egui_contexts: EguiContexts,
+        mut contexts: EguiContexts,
     ) {
-        let ctx = egui_contexts.ctx_mut();
+        let ctx = contexts.try_ctx_mut();
+        if ctx.is_none() { return; }
+        let ctx = ctx.unwrap();
+        
         if ctx.is_pointer_over_area() || ctx.wants_pointer_input() {
             return;
         }

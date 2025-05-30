@@ -4,13 +4,17 @@ use bevy_egui::{egui, EguiContextPass, EguiContexts};
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
 use crate::get;
+use crate::tool::bakes::BakePlugin;
 use crate::tool::movement::MovementPlugin;
 use crate::tool::room::RoomPlugin;
 use crate::tool::selection::SelectionPlugin;
+use crate::tool::show::ShowPlugin;
 
 pub mod selection;
 pub mod room;
 pub mod movement;
+mod bakes;
+mod show;
 
 pub struct ToolPlugin;
 
@@ -19,6 +23,8 @@ impl Plugin for ToolPlugin {
         app
             .init_resource::<ToolData>()
             .init_state::<Tools>()
+            .add_plugins(ShowPlugin)
+            .add_plugins(BakePlugin)
             .add_plugins(MovementPlugin)
             .add_plugins(SelectionPlugin)
             .add_plugins(RoomPlugin)

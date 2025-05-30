@@ -1,6 +1,4 @@
-use std::env::current_exe;
 use bevy::app::App;
-use bevy::math::bounding::Bounded3d;
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use crate::editor::input::CurrentMouseInput;
@@ -29,7 +27,12 @@ impl SelectionPlugin {
         mut gizmos: Gizmos,
         window: Query<&Window, With<PrimaryWindow>>,
     ) {
-        let window = window.single().unwrap();
+        let window = window.single();
+        if window.is_err() {
+            return;
+        }
+        let window = window.unwrap();
+        
         if !window.cursor_options.visible {
             state.hovered = None;
             return;

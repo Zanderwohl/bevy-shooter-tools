@@ -2,6 +2,9 @@ use bevy::app::App;
 use bevy::prelude::*;
 use bevy_egui::{egui, EguiContextPass, EguiContexts};
 use crate::{get, get_with_debug};
+use crate::editor::input::CurrentMouseInput;
+use crate::editor::multicam::{CameraAxis, Multicam};
+use crate::tool::Tools;
 
 pub struct RoomPlugin;
 
@@ -9,7 +12,12 @@ impl Plugin for RoomPlugin {
     fn build(&self, app: &mut App) {
         app
             .init_resource::<RoomTool>()
-            .add_systems(EguiContextPass, RoomTool::debug_window)
+            .add_event::<RecalculateRoomIntersections>()
+            .add_systems(EguiContextPass, RoomTool::debug_window.run_if(in_state(Tools::Room)))
+            .add_systems(Update, (
+                RoomTool::interface,
+                RoomTool::draw_active,
+                ).run_if(in_state(Tools::Room)))
         ;
     }
 }
@@ -17,6 +25,8 @@ impl Plugin for RoomPlugin {
 #[derive(Resource)]
 struct RoomTool {
     debug_window: bool,
+    debug_show_points: bool,
+    debug_show_cursor: bool,
     last_min: Vec3,
     last_max: Vec3,
     active_min: Option<Vec3>,
@@ -27,6 +37,8 @@ impl Default for RoomTool {
     fn default() -> Self {
         Self {
             debug_window: true,
+            debug_show_points: true,
+            debug_show_cursor: true,
             last_min: Vec3::ZERO,
             last_max: Vec3::new(10., 10., 10.),
             active_min: None,
@@ -78,9 +90,97 @@ impl RoomTool {
         self.active_max = Some(max);
     }
     
+    fn interface(
+        mut tool: ResMut<RoomTool>,
+        mut gizmos: Gizmos,
+        cameras: Query<(Entity, &Transform, &GlobalTransform, &Multicam, &Projection, &Camera)>,
+        mouse_input: Res<CurrentMouseInput>,
+    ) {
+        if tool.debug_show_points {
+            let last_color = Color::srgb_u8(0, 255, 0);
+            let active_color = Color::srgb_u8(0, 255, 255);
+            gizmos.sphere(tool.last_min, 0.1, last_color);
+            gizmos.sphere(tool.last_max, 0.1, last_color);
+            if let Some(active_min) = tool.active_min {
+                gizmos.sphere(active_min, 0.1, active_color);
+            }
+            if let Some(active_max) = tool.active_max {
+                gizmos.sphere(active_max, 0.1, active_color);
+            }
+        }
+        
+        let suggestion = if tool.active_min.is_some() {
+            tool.last_max
+        } else {
+            tool.last_min
+        };
+        if let Some(camera_entity) = mouse_input.in_camera {
+            if let Some(world_pos) = mouse_input.world_pos {
+                for (entity, tfm, g_tfm, multicam, _, cam) in cameras {
+                    if camera_entity == entity && multicam.axis != CameraAxis::None {
+                        let world_pos = world_pos.origin;
+                        if tool.debug_show_cursor {
+                            let color = Color::srgb_u8(0, 0, 255);
+                            gizmos.sphere(world_pos, 0.1, color);
+                        }
+                        
+                        let cursor = match multicam.axis {
+                            CameraAxis::None => panic!("{}", get!("debug.room.invalid_cursor")),
+                            CameraAxis::X => Vec3::new(suggestion.x, world_pos.y, world_pos.z),
+                            CameraAxis::Y => Vec3::new(world_pos.x, suggestion.y, world_pos.z),
+                            CameraAxis::Z => Vec3::new(world_pos.x, world_pos.y, suggestion.z),
+                        };
+                        let color = Color::srgb_u8(255, 0, 0);
+                        gizmos.sphere(cursor, 0.2, color);
+                        
+                        if let Some(button) = mouse_input.released {
+                            if button == MouseButton::Left {
+                                if tool.active_min.is_none() {
+                                    tool.active_min = Some(cursor);
+                                } else if tool.active_max.is_none() {
+                                    tool.active_max = Some(cursor);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn draw_active(
+        tool: Res<RoomTool>,
+        mut gizmos: Gizmos,
+    ) {
+        match (tool.active_min, tool.active_max) {
+            (Some(min), Some(max)) => {
+                let color = Color::srgb_u8(200, 200, 200);
+
+                // Bottom face (z = min.z)
+                gizmos.line(Vec3::new(min.x, min.y, min.z), Vec3::new(max.x, min.y, min.z), color);
+                gizmos.line(Vec3::new(max.x, min.y, min.z), Vec3::new(max.x, max.y, min.z), color);
+                gizmos.line(Vec3::new(max.x, max.y, min.z), Vec3::new(min.x, max.y, min.z), color);
+                gizmos.line(Vec3::new(min.x, max.y, min.z), Vec3::new(min.x, min.y, min.z), color);
+
+                // Top face (z = max.z)
+                gizmos.line(Vec3::new(min.x, min.y, max.z), Vec3::new(max.x, min.y, max.z), color);
+                gizmos.line(Vec3::new(max.x, min.y, max.z), Vec3::new(max.x, max.y, max.z), color);
+                gizmos.line(Vec3::new(max.x, max.y, max.z), Vec3::new(min.x, max.y, max.z), color);
+                gizmos.line(Vec3::new(min.x, max.y, max.z), Vec3::new(min.x, min.y, max.z), color);
+
+                // Vertical edges connecting bottom and top faces
+                gizmos.line(Vec3::new(min.x, min.y, min.z), Vec3::new(min.x, min.y, max.z), color);
+                gizmos.line(Vec3::new(max.x, min.y, min.z), Vec3::new(max.x, min.y, max.z), color);
+                gizmos.line(Vec3::new(max.x, max.y, min.z), Vec3::new(max.x, max.y, max.z), color);
+                gizmos.line(Vec3::new(min.x, max.y, min.z), Vec3::new(min.x, max.y, max.z), color);
+            }
+            _ => {}
+        }
+    }
+    
     fn debug_window(
         mut contexts: EguiContexts,
-        tool: Res<RoomTool>,
+        mut tool: ResMut<RoomTool>,
     ) {
         let ctx = contexts.try_ctx_mut();
         if ctx.is_none() { return; }
@@ -99,6 +199,9 @@ impl RoomTool {
             ui.label(get!("debug.room.last_max", "x", tool.last_max));
             ui.label(get!("debug.room.active_min", "x", active_min));
             ui.label(get!("debug.room.active_max", "x", active_max));
+            
+            ui.checkbox(&mut tool.debug_show_points, get!("debug.room.show_points"));
+            ui.checkbox(&mut tool.debug_show_cursor, get!("debug.room.show_cursor"));
         });
     }
 }
@@ -184,6 +287,9 @@ pub enum IntersectionResult {
     Identical,
     Intersection,
 }
+
+#[derive(Event)]
+pub struct RecalculateRoomIntersections;
 
 #[cfg(test)]
 mod tests {
