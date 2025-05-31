@@ -31,7 +31,11 @@ impl MovementPlugin {
         mut cameras: Query<(Entity, &mut Transform, &GlobalTransform, &Multicam, &mut Projection, &Camera)>,
         mut evr_scroll: EventReader<MouseWheel>,
     ) {
-        let mut window = window.single_mut().unwrap();
+        let mut window = window.single_mut();
+        if window.is_err() {
+            return;
+        }
+        let mut window = window.unwrap();
         
         if mouse_input.started_in_camera.is_none() {
             window.cursor_options.grab_mode = CursorGrabMode::None;
