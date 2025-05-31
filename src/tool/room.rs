@@ -179,6 +179,12 @@ impl RoomTool {
                         } else {
                             cursor
                         };
+                        if let Some(min) = tool.active_min {
+                            if tool.active_max.is_none() {
+                                let color = Color::srgb_u8(40, 40, 200);
+                                Self::bounds_gizmo(&mut gizmos, min, cursor, color);
+                            }
+                        }
                         
                         let color = Color::srgb_u8(255, 0, 0);
                         gizmos.sphere(cursor, 0.2, color);
