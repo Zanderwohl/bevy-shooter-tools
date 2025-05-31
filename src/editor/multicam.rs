@@ -4,7 +4,6 @@ use bevy::diagnostic::FrameCount;
 use bevy::ecs::query::QuerySingleError;
 use bevy::prelude::*;
 use bevy::render::camera::Viewport;
-use bevy::picking::pointer::PointerLocation;
 use bevy::render::view::RenderLayers;
 use bevy::window::{PrimaryWindow, WindowResized};
 use bevy_egui::{egui, EguiContextPass, EguiContexts};
@@ -93,10 +92,6 @@ impl MulticamPlugin {
     ) {
         let perspective = Projection::Perspective(PerspectiveProjection {
             fov: 120.0,
-            ..Default::default()
-        });
-        let perspective2 = Projection::Perspective(PerspectiveProjection {
-            fov: 200.0,
             ..Default::default()
         });
         let orthographic = Projection::Orthographic(OrthographicProjection {

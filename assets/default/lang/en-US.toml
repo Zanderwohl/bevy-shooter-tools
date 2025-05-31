@@ -65,3 +65,9 @@ show_points = "Show points"
 show_cursor = "Show 3D cursor"
 invalid_cursor = "Cursor is in an invalid state!"
 missing_material = "Room tool got in an invalid state with handles missing materials!"
+gizmos = "Gizmos"
+
+[debug.room.snap]
+title = "Snap"
+granularity = "Granularity"
+active = "Snap room tool"

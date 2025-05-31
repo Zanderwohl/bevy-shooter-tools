@@ -2,7 +2,7 @@ use bevy::app::App;
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use bevy_egui::{egui, EguiContextPass, EguiContexts};
-use crate::{get, get_with_debug};
+use crate::get;
 use crate::editor::input::{CurrentKeyboardInput, CurrentMouseInput};
 use crate::editor::multicam::{CameraAxis, Multicam};
 use crate::tool::Tools;
@@ -45,6 +45,8 @@ struct RoomTool {
     handle_mesh: Option<Handle<Mesh>>,
     handle_idle_color: Option<Handle<StandardMaterial>>,
     handle_highlight_color: Option<Handle<StandardMaterial>>,
+    snap: bool,
+    snap_granularity: f32,
 }
 
 impl Default for RoomTool {
@@ -61,6 +63,8 @@ impl Default for RoomTool {
             handle_mesh: None,
             handle_idle_color: None,
             handle_highlight_color: None,
+            snap: true,
+            snap_granularity: 0.1,
         }
     }
 }
@@ -165,6 +169,17 @@ impl RoomTool {
                             CameraAxis::Y => Vec3::new(world_pos.x, suggestion.y, world_pos.z),
                             CameraAxis::Z => Vec3::new(world_pos.x, world_pos.y, suggestion.z),
                         };
+                        let cursor = if tool.snap {
+                            let g = tool.snap_granularity;
+                            Vec3::new(
+                                f32::floor(cursor.x / g) * g,
+                                f32::floor(cursor.y / g) * g,
+                                f32::floor(cursor.z / g) * g
+                            )
+                        } else {
+                            cursor
+                        };
+                        
                         let color = Color::srgb_u8(255, 0, 0);
                         gizmos.sphere(cursor, 0.2, color);
                         
@@ -378,8 +393,13 @@ impl RoomTool {
             ui.label(get!("debug.room.active_min", "x", active_min));
             ui.label(get!("debug.room.active_max", "x", active_max));
             
+            ui.heading(get!("debug.room.gizmos"));
             ui.checkbox(&mut tool.debug_show_points, get!("debug.room.show_points"));
             ui.checkbox(&mut tool.debug_show_cursor, get!("debug.room.show_cursor"));
+            
+            ui.heading(get!("debug.room.snap.title"));
+            ui.checkbox(&mut tool.snap, get!("debug.room.snap.active"));
+            ui.add(egui::Slider::new(&mut tool.snap_granularity, 0.0..=0.2).text(get!("debug.room.snap.granularity")));
         });
     }
 }
