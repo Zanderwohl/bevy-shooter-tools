@@ -19,12 +19,14 @@ impl Plugin for RoomPlugin {
                 RoomTool::debug_window,
                 RoomTool::confirm_window,
             ).run_if(in_state(Tools::Room)))
+            .add_systems(Startup, RoomTool::init)
             .add_systems(Update, (
                 RoomTool::interface,
                 RoomTool::draw_active,
                 RoomTool::draw_handles,
                 RoomTool::draw_room_bounds,
                 RoomTool::handle_dragging,
+                RoomTool::cancel,
                 RoomTool::create_active_room,
                 ).run_if(in_state(Tools::Room)))
             .add_systems(OnExit(Tools::Room), RoomTool::despawn_handles)
@@ -70,9 +72,29 @@ impl Default for RoomTool {
 }
 
 impl RoomTool {
+    fn init(mut commands: Commands, mut tool: ResMut<Self>) {
+        let min = Vec3::new(-1.0, 0.0, -1.0);
+        let max = Vec3::new(1.0, 2.0, 1.0);
+        commands.spawn((
+            Room::new(min, max),
+        ));
+        tool.last_min = min;
+        tool.last_max = max;
+    }
+    
     fn clear(&mut self) {
         self.active_min = None;
         self.active_max = None;
+    }
+    
+    fn cancel(mut tool: ResMut<Self>, keyboard_input: Res<CurrentKeyboardInput>) {
+        if keyboard_input.cancel {
+            if tool.active_max.is_some() {
+                tool.active_max = None;
+            } else if tool.active_min.is_some() {
+                tool.active_min = None;
+            }
+        }
     }
     
     fn create_active_room(

@@ -56,6 +56,7 @@ impl Default for CurrentMouseInput {
 pub struct CurrentKeyboardInput {
     pub modify: bool,
     pub confirm: bool,
+    pub cancel: bool,
     forward: bool,
     left: bool,
     right: bool,
@@ -220,6 +221,7 @@ impl EditorInputPlugin {
         current_input.modify = keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight);
         current_input.update(&keys);
         current_input.confirm = keys.just_released(KeyCode::Enter) || keys.just_released(KeyCode::NumpadEnter);
+        current_input.cancel = keys.just_released(KeyCode::Escape);
     }
 }
 
