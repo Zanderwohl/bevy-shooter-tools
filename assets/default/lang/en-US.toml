@@ -50,6 +50,10 @@ perspective_cameras = "Perspective Cameras"
 [room.messages]
 ghost = "Room { me } is fully inside { other } and will not appear!"
 
+[room.confirm]
+title = "Room Creator"
+confirm = "Confirm"
+
 [debug.room]
 title = "Room Tool Debug"
 state = "Current Tool State"

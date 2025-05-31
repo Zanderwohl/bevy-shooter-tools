@@ -1,8 +1,9 @@
 use bevy::app::App;
 use bevy::prelude::*;
+use bevy::window::PrimaryWindow;
 use bevy_egui::{egui, EguiContextPass, EguiContexts};
 use crate::{get, get_with_debug};
-use crate::editor::input::CurrentMouseInput;
+use crate::editor::input::{CurrentKeyboardInput, CurrentMouseInput};
 use crate::editor::multicam::{CameraAxis, Multicam};
 use crate::tool::Tools;
 
@@ -13,11 +14,18 @@ impl Plugin for RoomPlugin {
         app
             .init_resource::<RoomTool>()
             .add_event::<RecalculateRoomIntersections>()
-            .add_systems(EguiContextPass, RoomTool::debug_window.run_if(in_state(Tools::Room)))
+            .add_event::<CreateRoom>()
+            .add_systems(EguiContextPass, (
+                RoomTool::debug_window,
+                RoomTool::confirm_window,
+            ).run_if(in_state(Tools::Room)))
             .add_systems(Update, (
                 RoomTool::interface,
                 RoomTool::draw_active,
                 RoomTool::draw_handles,
+                RoomTool::draw_room_bounds,
+                RoomTool::handle_dragging,
+                RoomTool::create_active_room,
                 ).run_if(in_state(Tools::Room)))
             .add_systems(OnExit(Tools::Room), RoomTool::despawn_handles)
         ;
@@ -34,7 +42,9 @@ struct RoomTool {
     active_min: Option<Vec3>,
     active_max: Option<Vec3>,
     handles_active: bool,
-    handle_stuff: Option<(Handle<Mesh>, Handle<StandardMaterial>)>,
+    handle_mesh: Option<Handle<Mesh>>,
+    handle_idle_color: Option<Handle<StandardMaterial>>,
+    handle_highlight_color: Option<Handle<StandardMaterial>>,
 }
 
 impl Default for RoomTool {
@@ -48,7 +58,9 @@ impl Default for RoomTool {
             active_min: None,
             active_max: None,
             handles_active: false,
-            handle_stuff: None,
+            handle_mesh: None,
+            handle_idle_color: None,
+            handle_highlight_color: None,
         }
     }
 }
@@ -57,6 +69,23 @@ impl RoomTool {
     fn clear(&mut self) {
         self.active_min = None;
         self.active_max = None;
+    }
+    
+    fn create_active_room(
+        mut tool: ResMut<Self>,
+        mut commands: Commands,
+        keyboard_input: Res<CurrentKeyboardInput>,
+        mut create_events: EventReader<CreateRoom>,
+    ) {
+        if !create_events.is_empty() || keyboard_input.confirm {
+            create_events.clear();
+            let new_room = tool.create();
+            if let Some(new_room) = new_room {
+                commands.spawn((
+                    new_room,
+                ));
+            }
+        }
     }
     
     fn create(&mut self) -> Option<Room> {
@@ -97,7 +126,7 @@ impl RoomTool {
     }
     
     fn interface(
-        mut tool: ResMut<RoomTool>,
+        mut tool: ResMut<Self>,
         mut gizmos: Gizmos,
         cameras: Query<(Entity, &Transform, &GlobalTransform, &Multicam, &Projection, &Camera)>,
         mouse_input: Res<CurrentMouseInput>,
@@ -153,6 +182,16 @@ impl RoomTool {
             }
         }
     }
+    
+    fn draw_room_bounds(
+        mut gizmos: Gizmos,
+        rooms: Query<(Entity, &Room)>,
+    ) {
+        let color = Color::srgb_u8(100, 100, 100);
+        for (_, room) in rooms {
+            Self::bounds_gizmo(&mut gizmos, room.min, room.max, color);
+        }
+    }
 
     fn draw_active(
         tool: Res<RoomTool>,
@@ -162,26 +201,30 @@ impl RoomTool {
             (Some(min), Some(max)) => {
                 let color = Color::srgb_u8(200, 200, 200);
 
-                // Bottom face (z = min.z)
-                gizmos.line(Vec3::new(min.x, min.y, min.z), Vec3::new(max.x, min.y, min.z), color);
-                gizmos.line(Vec3::new(max.x, min.y, min.z), Vec3::new(max.x, max.y, min.z), color);
-                gizmos.line(Vec3::new(max.x, max.y, min.z), Vec3::new(min.x, max.y, min.z), color);
-                gizmos.line(Vec3::new(min.x, max.y, min.z), Vec3::new(min.x, min.y, min.z), color);
-
-                // Top face (z = max.z)
-                gizmos.line(Vec3::new(min.x, min.y, max.z), Vec3::new(max.x, min.y, max.z), color);
-                gizmos.line(Vec3::new(max.x, min.y, max.z), Vec3::new(max.x, max.y, max.z), color);
-                gizmos.line(Vec3::new(max.x, max.y, max.z), Vec3::new(min.x, max.y, max.z), color);
-                gizmos.line(Vec3::new(min.x, max.y, max.z), Vec3::new(min.x, min.y, max.z), color);
-
-                // Vertical edges connecting bottom and top faces
-                gizmos.line(Vec3::new(min.x, min.y, min.z), Vec3::new(min.x, min.y, max.z), color);
-                gizmos.line(Vec3::new(max.x, min.y, min.z), Vec3::new(max.x, min.y, max.z), color);
-                gizmos.line(Vec3::new(max.x, max.y, min.z), Vec3::new(max.x, max.y, max.z), color);
-                gizmos.line(Vec3::new(min.x, max.y, min.z), Vec3::new(min.x, max.y, max.z), color);
+                Self::bounds_gizmo(&mut gizmos, min, max, color);
             }
             _ => {}
         }
+    }
+
+    fn bounds_gizmo(gizmos: &mut Gizmos, min: Vec3, max: Vec3, color: Color) {
+        // Bottom face (z = min.z)
+        gizmos.line(Vec3::new(min.x, min.y, min.z), Vec3::new(max.x, min.y, min.z), color);
+        gizmos.line(Vec3::new(max.x, min.y, min.z), Vec3::new(max.x, max.y, min.z), color);
+        gizmos.line(Vec3::new(max.x, max.y, min.z), Vec3::new(min.x, max.y, min.z), color);
+        gizmos.line(Vec3::new(min.x, max.y, min.z), Vec3::new(min.x, min.y, min.z), color);
+
+        // Top face (z = max.z)
+        gizmos.line(Vec3::new(min.x, min.y, max.z), Vec3::new(max.x, min.y, max.z), color);
+        gizmos.line(Vec3::new(max.x, min.y, max.z), Vec3::new(max.x, max.y, max.z), color);
+        gizmos.line(Vec3::new(max.x, max.y, max.z), Vec3::new(min.x, max.y, max.z), color);
+        gizmos.line(Vec3::new(min.x, max.y, max.z), Vec3::new(min.x, min.y, max.z), color);
+
+        // Vertical edges connecting bottom and top faces
+        gizmos.line(Vec3::new(min.x, min.y, min.z), Vec3::new(min.x, min.y, max.z), color);
+        gizmos.line(Vec3::new(max.x, min.y, min.z), Vec3::new(max.x, min.y, max.z), color);
+        gizmos.line(Vec3::new(max.x, max.y, min.z), Vec3::new(max.x, max.y, max.z), color);
+        gizmos.line(Vec3::new(min.x, max.y, min.z), Vec3::new(min.x, max.y, max.z), color);
     }
 
     fn centroid(&self) -> Option<Vec3> {
@@ -216,36 +259,40 @@ impl RoomTool {
     }
 
     fn draw_handles(
+        mut tool: ResMut<Self>,
         handles: Query<Entity, With<RoomToolHandle>>,
-        mut tool: ResMut<RoomTool>,
         mut gizmos: Gizmos,
         mut commands: Commands,
         mut meshes: ResMut<Assets<Mesh>>,
         mut materials: ResMut<Assets<StandardMaterial>>,
     ) {
-        let color = Color::srgb_u8(200, 255, 200);
         let face_centers = tool.face_centers();
-        for center in &face_centers {
-           //  gizmos.sphere(center, 0.3, color);
-        }
         
         if let (Some(min), Some(max)) = (tool.active_min, tool.active_max) {
             // spawn handles
             if !tool.handles_active {
                 tool.handles_active = true;
                 for center in &face_centers {
-                    if tool.handle_stuff.is_none() {
+                    if tool.handle_mesh.is_none() {
                         let mesh = meshes.add(Cuboid::new(0.3, 0.3, 0.3));
-                        let material = materials.add(Color::srgb_u8(200, 255, 200));
-                        tool.handle_stuff = Some((mesh, material))
+                        //let idle_material = materials.add(Color::srgb_u8(180, 230, 180));
+                        let idle_material = materials.add(StandardMaterial {
+                            base_color: Color::srgb_u8(180, 230, 180),
+                            emissive: LinearRgba::rgb(0.2, 0.3, 0.2),
+                            ..Default::default()
+                        });
+                        let highlight_material = materials.add(Color::srgb_u8(220, 255, 220));
+                        tool.handle_mesh = Some(mesh);
+                        tool.handle_idle_color = Some(idle_material);
+                        tool.handle_highlight_color = Some(highlight_material);
                     }
                     
-                    match &tool.handle_stuff {
-                        Some((mesh, material)) => {
+                    match (&tool.handle_mesh, &tool.handle_idle_color) {
+                        (Some(mesh), Some(color)) => {
                             commands.spawn((
                                 RoomToolHandle,
                                 Mesh3d(mesh.clone()),
-                                MeshMaterial3d(material.clone()),
+                                MeshMaterial3d(color.clone()),
                                 Transform::from_translation(*center),
                             ));
                         }
@@ -263,14 +310,56 @@ impl RoomTool {
         }
     }
     
-    fn despawn_handles(handles: Query<Entity, With<RoomToolHandle>>, mut commands: Commands, mut tool: ResMut<RoomTool>) {
+    fn handle_dragging(
+        handles: Query<Entity, With<RoomToolHandle>>,
+        window: Query<&Window, With<PrimaryWindow>>,
+        mut ray_cast: MeshRayCast,
+        mouse_input: Res<CurrentMouseInput>,
+    ) {
+        let window = window.single();
+        if window.is_err() {
+            return;
+        }
+        let window = window.unwrap();
+        
+        let filter = |entity| handles.get(entity).is_ok();
+        let settings = MeshRayCastSettings::default().with_filter(&filter);
+        
+        if let Some(ray) = mouse_input.world_pos {
+            if let Some((hit_entity, hit_data)) = ray_cast
+                .cast_ray(ray, &settings)
+                .first() {
+                info!("{}", hit_entity);
+            }
+        }
+    }
+    
+    fn confirm_window(
+        mut tool: ResMut<Self>,
+        mut contexts: EguiContexts,
+        mut create_room: EventWriter<CreateRoom>,
+    ) {
+        let ctx = contexts.try_ctx_mut();
+        if ctx.is_none() { return; }
+        let ctx = ctx.unwrap();
+
+        if let (Some(min), Some(max)) = (tool.active_min, tool.active_max) {
+            egui::Window::new(get!("room.confirm.title")).show(ctx, |ui| {
+                if ui.button(get!("room.confirm.confirm")).clicked() {
+                    create_room.write(CreateRoom);
+                }
+            });
+        }
+    }
+
+    fn despawn_handles(handles: Query<Entity, With<RoomToolHandle>>, mut commands: Commands, mut tool: ResMut<Self>) {
         crate::common::systems::despawn_entities_with::<RoomToolHandle>(commands, handles);
         tool.handles_active = false;
     }
     
     fn debug_window(
         mut contexts: EguiContexts,
-        mut tool: ResMut<RoomTool>,
+        mut tool: ResMut<Self>,
     ) {
         let ctx = contexts.try_ctx_mut();
         if ctx.is_none() { return; }
@@ -383,6 +472,9 @@ pub enum IntersectionResult {
 
 #[derive(Event)]
 pub struct RecalculateRoomIntersections;
+
+#[derive(Event)]
+pub struct CreateRoom;
 
 #[cfg(test)]
 mod tests {
