@@ -13,7 +13,7 @@ impl Plugin for RoomPlugin {
     fn build(&self, app: &mut App) {
         app
             .init_resource::<RoomTool>()
-            .add_event::<RecalculateRoomIntersections>()
+            .add_event::<CalculateRoomGeometry>()
             .add_event::<CreateRoom>()
             .add_systems(EguiContextPass, (
                 RoomTool::debug_window,
@@ -200,7 +200,6 @@ impl RoomTool {
         match (tool.active_min, tool.active_max) {
             (Some(min), Some(max)) => {
                 let color = Color::srgb_u8(200, 200, 200);
-
                 Self::bounds_gizmo(&mut gizmos, min, max, color);
             }
             _ => {}
@@ -471,7 +470,7 @@ pub enum IntersectionResult {
 }
 
 #[derive(Event)]
-pub struct RecalculateRoomIntersections;
+pub struct CalculateRoomGeometry;
 
 #[derive(Event)]
 pub struct CreateRoom;

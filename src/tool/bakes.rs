@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use bevy_egui::{egui, EguiContextPass, EguiContexts};
 use crate::get;
-use crate::tool::room::RecalculateRoomIntersections;
+use crate::tool::room::CalculateRoomGeometry;
 
 pub struct BakePlugin;
 
@@ -16,7 +16,7 @@ impl Plugin for BakePlugin {
 impl BakePlugin {
     fn bake_ui(
         mut contexts: EguiContexts,
-        mut room_events: EventWriter<RecalculateRoomIntersections>
+        mut room_events: EventWriter<CalculateRoomGeometry>
     ) {
         let ctx = contexts.try_ctx_mut();
         if ctx.is_none() { return; }
@@ -24,8 +24,8 @@ impl BakePlugin {
         
         egui::Window::new(get!("bakes.title")).show(ctx, |ui| {
            ui.vertical(|ui| {
-               if ui.button(get!("bakes.intersections")).clicked() {
-                   room_events.write(RecalculateRoomIntersections);
+               if ui.button(get!("bakes.room_geometry")).clicked() {
+                   room_events.write(CalculateRoomGeometry);
                }
            });
         });

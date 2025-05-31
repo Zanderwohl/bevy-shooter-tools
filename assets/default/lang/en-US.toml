@@ -39,7 +39,7 @@ room = "Room"
 
 [bakes]
 title = "Bake Operations"
-intersections = "Room Intersections"
+room_geometry = "Room Geometry"
 
 [show]
 title = "Show/Hide"

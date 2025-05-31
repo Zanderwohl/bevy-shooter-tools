@@ -4,12 +4,13 @@ use bevy::diagnostic::FrameCount;
 use bevy::ecs::query::QuerySingleError;
 use bevy::prelude::*;
 use bevy::render::camera::Viewport;
-use bevy::picking::pointer::{PointerLocation};
+use bevy::picking::pointer::PointerLocation;
 use bevy::render::view::RenderLayers;
 use bevy::window::{PrimaryWindow, WindowResized};
 use bevy_egui::{egui, EguiContextPass, EguiContexts};
 use bevy_vector_shapes::prelude::*;
-use crate::tool::selection::{EditorSelectable};
+use crate::common::painter;
+use crate::tool::selection::EditorSelectable;
 use crate::get;
 
 pub struct MulticamPlugin {
@@ -462,8 +463,8 @@ impl MulticamPlugin {
 
                                 let min = viewport.physical_position.as_vec2();
                                 let max = min + viewport.physical_size.as_vec2();
-                                let min = window_to_painter(&ui_cam, min);
-                                let max = window_to_painter(&ui_cam, max);
+                                let min = painter::window_to_painter(&ui_cam, min);
+                                let max = painter::window_to_painter(&ui_cam, max);
 
                                 if state.debug_mouseover_boxes {
                                     draw_rect(&mut painter, min, max);
@@ -483,8 +484,8 @@ impl MulticamPlugin {
             if state.debug_viewport_box {
                 painter.reset();
                 painter.render_layers = Some(RenderLayers::layer(31));
-                let viewport_start = window_to_painter_frac(&ui_cam, state.start).extend(1.0);
-                let viewport_end = window_to_painter_frac(&ui_cam, state.end).extend(1.0);
+                let viewport_start = painter::window_to_painter_frac(&ui_cam, state.start).extend(1.0);
+                let viewport_end = painter::window_to_painter_frac(&ui_cam, state.end).extend(1.0);
                 painter.color = Color::srgb_u8(0, 0, 255);
                 draw_rect(&mut painter, viewport_start.truncate(), viewport_end.truncate());
             }
@@ -493,7 +494,7 @@ impl MulticamPlugin {
                 if let Some(cursor_window_pos) = window.cursor_position() {
                     painter.reset();
                     painter.render_layers = Some(RenderLayers::layer(31));
-                    painter.set_translation(window_to_painter(&ui_cam, cursor_window_pos).extend(1.0));
+                    painter.set_translation(painter::window_to_painter(&ui_cam, cursor_window_pos).extend(1.0));
                     painter.circle(10.0);
                 }
             }
@@ -514,8 +515,8 @@ impl MulticamPlugin {
 
         let min = viewport.physical_position.as_vec2();
         let max = min + viewport.physical_size.as_vec2();
-        let min = window_to_painter(&ui_cam, min);
-        let max = window_to_painter(&ui_cam, max);
+        let min = painter::window_to_painter(&ui_cam, min);
+        let max = painter::window_to_painter(&ui_cam, max);
 
         draw_rect(&mut painter, min, max);
     }
@@ -530,45 +531,4 @@ fn draw_rect(
     painter.line(Vec3::new(min.x, max.y, 0.0), Vec3::new(max.x, max.y, 0.0)); // Top
     painter.line(Vec3::new(min.x, min.y, 0.0), Vec3::new(min.x, max.y, 0.0)); // Left
     painter.line(Vec3::new(max.x, min.y, 0.0), Vec3::new(max.x, max.y, 0.0)); // Right
-}
-
-fn window_to_painter(cam: &Camera, pos: Vec2) -> Vec2 {
-    let cam_viewport = cam.physical_viewport_rect().unwrap();
-    let size_x = (cam_viewport.max.x - cam_viewport.min.x) as f32;
-    let size_y = (cam_viewport.max.y - cam_viewport.min.y) as f32;
-    Vec2::new(
-        (cam_viewport.max.x - cam_viewport.min.x) as f32 * (pos.x / size_x - 0.5),
-        (cam_viewport.max.y - cam_viewport.min.y) as f32 * (1.0 - (pos.y / size_y + 0.5))
-    )
-}
-
-fn window_to_painter_broken(cam: &Camera, pos: Vec2, state: &MulticamState) -> Vec2 {
-    let cam_viewport = cam.physical_viewport_rect().unwrap();
-    let size_x = (cam_viewport.max.x - cam_viewport.min.x) as f32 * (state.end.x - state.start.x);
-    let size_y = (cam_viewport.max.y - cam_viewport.min.y) as f32 * (state.end.y - state.start.y);
-    Vec2::new(
-        (cam_viewport.max.x - cam_viewport.min.x) as f32 * (pos.x / size_x - 0.5),
-        (cam_viewport.max.y - cam_viewport.min.y) as f32 * (1.0 - (pos.y / size_y + 0.5))
-    )
-}
-
-fn window_to_painter_frac(cam: &Camera, frac: Vec2) -> Vec2 {
-    let cam_viewport = cam.physical_viewport_rect().unwrap();
-    Vec2::new(
-        (cam_viewport.max.x - cam_viewport.min.x) as f32 * (frac.x - 0.5),
-        (cam_viewport.max.y - cam_viewport.min.y) as f32 * (1.0 - (frac.y + 0.5))
-    )
-}
-
-fn make_ray(
-    primary_window_entity: &Query<Entity, With<PrimaryWindow>>,
-    camera: &Camera,
-    camera_tfm: &GlobalTransform,
-    pointer_loc: &PointerLocation,
-) -> Option<Ray3d> {
-    let pointer_loc = pointer_loc.location()?;
-    if !pointer_loc.is_in_viewport(camera, primary_window_entity) {
-        return None;
-    }
-    camera.viewport_to_world(camera_tfm, pointer_loc.position).ok()
 }
