@@ -10,6 +10,7 @@ pub struct Item {
     stat_tracker: Option<StatTracker>,
     particle_effect: Option<Arc<ParticleEffect>>,
     trade_restriction: bool,
+    destroyed: bool,
 }
 
 impl Item {
@@ -66,6 +67,14 @@ impl Item {
         if !self.can_change_description() { return; }
         self.description = Some(description);
     }
+    
+    pub fn can_destroy(&self) -> bool {
+        !self.prototype.stock
+    }
+    
+    pub fn destroy(&mut self) {
+        self.destroyed = true;
+    }
 }
 
 #[derive(Clone)]
@@ -76,6 +85,7 @@ pub struct ItemNetworkable {
     stat_tracker: Option<StatTracker>,
     particle_effect_key: Option<String>,
     trade_restriction: bool,
+    destroyed: bool,
 }
 
 #[derive(Clone)]
