@@ -45,8 +45,8 @@ struct RoomTool {
     active_max: Option<Vec3>,
     handles_active: bool,
     handle_mesh: Option<Handle<Mesh>>,
-    handle_idle_color: Option<Handle<StandardMaterial>>,
-    handle_highlight_color: Option<Handle<StandardMaterial>>,
+    handle_idle_material: Option<Handle<StandardMaterial>>,
+    handle_highlight_material: Option<Handle<StandardMaterial>>,
     snap: bool,
     snap_granularity: f32,
 }
@@ -55,16 +55,16 @@ impl Default for RoomTool {
     fn default() -> Self {
         Self {
             debug_window: true,
-            debug_show_points: true,
-            debug_show_cursor: true,
+            debug_show_points: false,
+            debug_show_cursor: false,
             last_min: Vec3::ZERO,
             last_max: Vec3::new(10., 10., 10.),
             active_min: None,
             active_max: None,
             handles_active: false,
             handle_mesh: None,
-            handle_idle_color: None,
-            handle_highlight_color: None,
+            handle_idle_material: None,
+            handle_highlight_material: None,
             snap: true,
             snap_granularity: 0.1,
         }
@@ -194,9 +194,9 @@ impl RoomTool {
                         let cursor = if tool.snap {
                             let g = tool.snap_granularity;
                             Vec3::new(
-                                f32::floor(cursor.x / g) * g,
-                                f32::floor(cursor.y / g) * g,
-                                f32::floor(cursor.z / g) * g
+                                f32::ceil(cursor.x / g) * g,
+                                f32::ceil(cursor.y / g) * g,
+                                f32::ceil(cursor.z / g) * g
                             )
                         } else {
                             cursor
@@ -209,7 +209,9 @@ impl RoomTool {
                         }
                         
                         let color = Color::srgb_u8(255, 0, 0);
-                        gizmos.sphere(cursor, 0.2, color);
+                        if tool.active_min.is_none() {
+                            gizmos.sphere(cursor, 0.2, color);
+                        }
                         
                         if let Some(button) = mouse_input.released {
                             if button == MouseButton::Left {
@@ -323,13 +325,17 @@ impl RoomTool {
                             emissive: LinearRgba::rgb(0.2, 0.3, 0.2),
                             ..Default::default()
                         });
-                        let highlight_material = materials.add(Color::srgb_u8(220, 255, 220));
+                        let highlight_material = materials.add(StandardMaterial {
+                            base_color: Color::srgb_u8(220, 255, 255),
+                            emissive: LinearRgba::rgb(0.3, 0.4, 0.4),
+                            ..Default::default()
+                        });
                         tool.handle_mesh = Some(mesh);
-                        tool.handle_idle_color = Some(idle_material);
-                        tool.handle_highlight_color = Some(highlight_material);
+                        tool.handle_idle_material = Some(idle_material);
+                        tool.handle_highlight_material = Some(highlight_material);
                     }
                     
-                    match (&tool.handle_mesh, &tool.handle_idle_color) {
+                    match (&tool.handle_mesh, &tool.handle_idle_material) {
                         (Some(mesh), Some(color)) => {
                             commands.spawn((
                                 RoomToolHandle,
@@ -357,6 +363,8 @@ impl RoomTool {
         window: Query<&Window, With<PrimaryWindow>>,
         mut ray_cast: MeshRayCast,
         mouse_input: Res<CurrentMouseInput>,
+        mut commands: Commands,
+        tool: Res<Self>,
     ) {
         let window = window.single();
         if window.is_err() {
@@ -366,16 +374,43 @@ impl RoomTool {
         
         let filter = |entity| handles.get(entity).is_ok();
         let settings = MeshRayCastSettings::default().with_filter(&filter);
-        
-        if let Some(ray) = mouse_input.world_pos {
-            if let Some((hit_entity, hit_data)) = ray_cast
-                .cast_ray(ray, &settings)
-                .first() {
-                info!("{}", hit_entity);
+
+        if let (Some(idle), Some(highlight)) = (&tool.handle_idle_material, &tool.handle_highlight_material) {
+            let highlight = highlight.clone();
+            if let Some(ray) = mouse_input.world_pos {
+                if let Some((hit_entity, hit_data)) = ray_cast
+                    .cast_ray(ray, &settings)
+                    .first() {
+                    commands.entity(*hit_entity)
+                        .remove::<MeshMaterial3d<StandardMaterial>>()
+                        .insert(MeshMaterial3d(highlight));
+
+                    for handle in &handles {
+                        if handle != *hit_entity {
+                            commands.entity(handle)
+                                .remove::<MeshMaterial3d<StandardMaterial>>()
+                                .insert(MeshMaterial3d(idle.clone()));
+                        }
+                    }
+
+                    info!("{}", hit_entity);
+                } else {
+                    for handle in &handles {
+                        commands.entity(handle)
+                            .remove::<MeshMaterial3d<StandardMaterial>>()
+                            .insert(MeshMaterial3d(idle.clone()));
+                    }
+                }
+            } else {
+                for handle in &handles {
+                    commands.entity(handle)
+                        .remove::<MeshMaterial3d<StandardMaterial>>()
+                        .insert(MeshMaterial3d(idle.clone()));
+                }
             }
         }
     }
-    
+
     fn confirm_window(
         mut tool: ResMut<Self>,
         mut contexts: EguiContexts,
