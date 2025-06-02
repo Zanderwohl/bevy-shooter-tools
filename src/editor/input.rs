@@ -26,6 +26,7 @@ impl Plugin for EditorInputPlugin {
 #[derive(Resource)]
 pub struct CurrentMouseInput {
     pub pressed: Option<MouseButton>,
+    pub just_pressed: bool,
     pub released: Option<MouseButton>,
     pub in_camera: Option<Entity>,
     pub started_in_camera: Option<Entity>,
@@ -40,6 +41,7 @@ impl Default for CurrentMouseInput {
     fn default() -> Self {
         Self {
             pressed: None,
+            just_pressed: false,
             released: None,
             in_camera: None,
             started_in_camera: None,
@@ -161,6 +163,7 @@ impl EditorInputPlugin {
 
         let window = primary_window.single().unwrap();
         let (just_pressed, pressed, released) = mouse_precedence(mouse_buttons);
+        current_input.just_pressed = just_pressed;
         current_input.pressed = pressed;
         current_input.released = released;
 

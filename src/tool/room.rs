@@ -1,3 +1,4 @@
+use std::cmp::PartialEq;
 use bevy::app::App;
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
@@ -49,6 +50,9 @@ struct RoomTool {
     handle_highlight_material: Option<Handle<StandardMaterial>>,
     snap: bool,
     snap_granularity: f32,
+    drag_start: Option<Vec3>,
+    drag_handle_entity: Option<Entity>,
+    drag_handle_start: Option<Vec3>,
 }
 
 impl Default for RoomTool {
@@ -67,6 +71,9 @@ impl Default for RoomTool {
             handle_highlight_material: None,
             snap: true,
             snap_granularity: 0.1,
+            drag_start: None,
+            drag_handle_entity: None,
+            drag_handle_start: None,
         }
     }
 }
@@ -212,13 +219,29 @@ impl RoomTool {
                         if tool.active_min.is_none() {
                             gizmos.sphere(cursor, 0.2, color);
                         }
-                        
+
                         if let Some(button) = mouse_input.released {
                             if button == MouseButton::Left {
                                 if tool.active_min.is_none() {
                                     tool.active_min = Some(cursor);
                                 } else if tool.active_max.is_none() {
                                     tool.active_max = Some(cursor);
+                                    
+                                    // if anything any min > max, swap them.
+                                    if let (Some(min), Some(max)) = (tool.active_min, tool.active_max) {
+                                        let new_min = Vec3::new(
+                                            f32::min(min.x, max.x),
+                                            f32::min(min.y, max.y),
+                                            f32::min(min.z, max.z),
+                                        );
+                                        let new_max = Vec3::new(
+                                            f32::max(min.x, max.x),
+                                            f32::max(min.y, max.y),
+                                            f32::max(min.z, max.z),
+                                        );
+                                        tool.active_min = Some(new_min);
+                                        tool.active_max = Some(new_max);
+                                    }
                                 }
                             }
                         }
@@ -285,19 +308,19 @@ impl RoomTool {
         }
     }
 
-    fn face_centers(&self) -> Vec<Vec3> {
-        let mut face_centers: Vec<Vec3> = Vec::new();
+    fn face_centers(&self) -> Vec<(Vec3, HandleAxis)> {
+        let mut face_centers: Vec<(Vec3, HandleAxis)> = Vec::new();
         self.centroid().map(|centroid| {
             let half_size = self.size() / 2.0;
 
-            face_centers.push(Vec3::new(centroid.x + half_size.x, centroid.y, centroid.z));
-            face_centers.push(Vec3::new(centroid.x - half_size.x, centroid.y, centroid.z));
+            face_centers.push((Vec3::new(centroid.x + half_size.x, centroid.y, centroid.z), HandleAxis::MaxX));
+            face_centers.push((Vec3::new(centroid.x - half_size.x, centroid.y, centroid.z), HandleAxis::MinX));
 
-            face_centers.push(Vec3::new(centroid.x, centroid.y + half_size.y, centroid.z));
-            face_centers.push(Vec3::new(centroid.x, centroid.y - half_size.y, centroid.z));
+            face_centers.push((Vec3::new(centroid.x, centroid.y + half_size.y, centroid.z), HandleAxis::MaxY));
+            face_centers.push((Vec3::new(centroid.x, centroid.y - half_size.y, centroid.z), HandleAxis::MinY));
 
-            face_centers.push(Vec3::new(centroid.x, centroid.y, centroid.z + half_size.z));
-            face_centers.push(Vec3::new(centroid.x, centroid.y, centroid.z - half_size.z));
+            face_centers.push((Vec3::new(centroid.x, centroid.y, centroid.z + half_size.z), HandleAxis::MaxZ));
+            face_centers.push((Vec3::new(centroid.x, centroid.y, centroid.z - half_size.z), HandleAxis::MinZ));
         });
         face_centers
     }
@@ -316,7 +339,7 @@ impl RoomTool {
             // spawn handles
             if !tool.handles_active {
                 tool.handles_active = true;
-                for center in &face_centers {
+                for (center, axis) in face_centers {
                     if tool.handle_mesh.is_none() {
                         let mesh = meshes.add(Cuboid::new(0.3, 0.3, 0.3));
                         //let idle_material = materials.add(Color::srgb_u8(180, 230, 180));
@@ -338,10 +361,10 @@ impl RoomTool {
                     match (&tool.handle_mesh, &tool.handle_idle_material) {
                         (Some(mesh), Some(color)) => {
                             commands.spawn((
-                                RoomToolHandle,
+                                RoomToolHandle { axis },
                                 Mesh3d(mesh.clone()),
                                 MeshMaterial3d(color.clone()),
-                                Transform::from_translation(*center),
+                                Transform::from_translation(center),
                             ));
                         }
                         _ => panic!("{}", get!("room.missing_material"))
@@ -359,12 +382,12 @@ impl RoomTool {
     }
     
     fn handle_dragging(
-        handles: Query<Entity, With<RoomToolHandle>>,
+        mut handles: Query<(Entity, &RoomToolHandle, &mut Transform)>,
         window: Query<&Window, With<PrimaryWindow>>,
         mut ray_cast: MeshRayCast,
         mouse_input: Res<CurrentMouseInput>,
         mut commands: Commands,
-        tool: Res<Self>,
+        mut tool: ResMut<Self>,
     ) {
         let window = window.single();
         if window.is_err() {
@@ -375,34 +398,135 @@ impl RoomTool {
         let filter = |entity| handles.get(entity).is_ok();
         let settings = MeshRayCastSettings::default().with_filter(&filter);
 
-        if let (Some(idle), Some(highlight)) = (&tool.handle_idle_material, &tool.handle_highlight_material) {
-            let highlight = highlight.clone();
+        if let (Some(idle), Some(highlight)) = (tool.handle_idle_material.clone(), tool.handle_highlight_material.clone()) {
             if let Some(ray) = mouse_input.world_pos {
                 if let Some((hit_entity, hit_data)) = ray_cast
                     .cast_ray(ray, &settings)
                     .first() {
+                    if mouse_input.pressed == Some(MouseButton::Left) {
+                        if tool.drag_start.is_none() && mouse_input.just_pressed {
+                            tool.drag_handle_entity = Some(*hit_entity);
+                            tool.drag_start = Some(hit_data.point);
+                            if let Ok((_, _, tfm)) = handles.get(*hit_entity) {
+                                tool.drag_handle_start = Some(tfm.translation);
+                            }
+                        }
+                    } else {
+                        tool.drag_start = None;
+                        tool.drag_handle_entity = None;
+                        tool.drag_handle_start = None;
+                    }
+
                     commands.entity(*hit_entity)
                         .remove::<MeshMaterial3d<StandardMaterial>>()
                         .insert(MeshMaterial3d(highlight));
 
-                    for handle in &handles {
-                        if handle != *hit_entity {
-                            commands.entity(handle)
+                    for (handle_entity, handle, tfm) in &mut handles {
+                        if handle_entity != *hit_entity {
+                            commands.entity(handle_entity)
                                 .remove::<MeshMaterial3d<StandardMaterial>>()
                                 .insert(MeshMaterial3d(idle.clone()));
                         }
                     }
 
-                    info!("{}", hit_entity);
-                } else {
-                    for handle in &handles {
+                    if let (Some(drag_start), Some(drag_handle_entity), Some(drag_handle_start)) = (tool.drag_start, tool.drag_handle_entity, tool.drag_handle_start) {
+                        let diff = drag_start - hit_data.point;
+                        for (handle_entity, handle, mut tfm) in &mut handles {
+                            if handle_entity == *hit_entity {
+                                info!("{}", diff);
+                                let active_min = tool.active_min.clone().unwrap();
+                                let active_max = tool.active_max.clone().unwrap();
+                                let g = tool.snap_granularity;
+                                match &handle.axis {
+                                    HandleAxis::MinX => {
+                                        let new_x = f32::min(f32::ceil((drag_handle_start.x - diff.x) / g) * g, active_max.x - g);
+                                        info!("{}", new_x);
+                                        tool.active_min = Some(Vec3::new(
+                                            new_x,
+                                            active_min.y,
+                                            active_min.z,
+                                        ));
+                                        tfm.translation.x = new_x;
+                                    },
+                                    HandleAxis::MaxX => {
+                                        let new_x = f32::max(f32::ceil((drag_handle_start.x - diff.x) / g) * g, active_min.x + g);
+                                        info!("{}", new_x);
+                                        tool.active_max = Some(Vec3::new(
+                                           new_x,
+                                           active_max.y,
+                                           active_max.z,
+                                        ));
+                                        tfm.translation.x = new_x;
+                                    },
+                                    HandleAxis::MinY => {
+                                        let new_y = f32::min(f32::ceil((drag_handle_start.y - diff.y) / g) * g, active_max.y - g);
+                                        info!("{}", new_y);
+                                        tool.active_min = Some(Vec3::new(
+                                            active_min.x,
+                                            new_y,
+                                            active_min.z,
+                                        ));
+                                        tfm.translation.y = new_y;
+                                    },
+                                    HandleAxis::MaxY => {
+                                        let new_y = f32::max(f32::ceil((drag_handle_start.y - diff.y) / g) * g, active_min.y + g);
+                                        info!("{}", new_y);
+                                        tool.active_max = Some(Vec3::new(
+                                            active_max.x,
+                                            new_y,
+                                            active_max.z,
+                                        ));
+                                        tfm.translation.y = new_y;
+                                    },
+                                    HandleAxis::MinZ => {
+                                        let new_z = f32::min(f32::ceil((drag_handle_start.z - diff.z) / g) * g, active_max.z - g);
+                                        info!("{}", new_z);
+                                        tool.active_min = Some(Vec3::new(
+                                            active_min.x,
+                                            active_min.y,
+                                            new_z,
+                                        ));
+                                        tfm.translation.z = new_z;
+                                    },
+                                    HandleAxis::MaxZ => {
+                                        let new_z = f32::max(f32::ceil((drag_handle_start.z - diff.z) / g) * g, active_min.z + g);
+                                        info!("{}", new_z);
+                                        tool.active_max = Some(Vec3::new(
+                                            active_max.x,
+                                            active_max.y,
+                                            new_z,
+                                        ));
+                                        tfm.translation.z = new_z;
+                                    },
+                                    _ => {}
+                                };
+                                // TODO tfm.translation = 
+                            }
+                        }
+                        let points = tool.face_centers();
+                        for (handle_entity, handle, mut tfm) in &mut handles {
+                            for (a, b) in &points {
+                                if b == &handle.axis {
+                                    tfm.translation = *a;
+                                }
+                            }
+                        }
+                    }
+                } else { // This occurs when the ray hits nothing.
+                    tool.drag_start = None;
+                    tool.drag_handle_entity = None;
+                    tool.drag_handle_start = None;
+                    for (handle, _, _) in &handles {
                         commands.entity(handle)
                             .remove::<MeshMaterial3d<StandardMaterial>>()
                             .insert(MeshMaterial3d(idle.clone()));
                     }
                 }
-            } else {
-                for handle in &handles {
+            } else { // this occurs when the mouse is outside and there is no ray.
+                tool.drag_start = None;
+                tool.drag_handle_entity = None;
+                tool.drag_handle_start = None;
+                for (handle, _, _) in &handles {
                     commands.entity(handle)
                         .remove::<MeshMaterial3d<StandardMaterial>>()
                         .insert(MeshMaterial3d(idle.clone()));
@@ -468,7 +592,19 @@ impl RoomTool {
 }
 
 #[derive(Component)]
-pub struct RoomToolHandle;
+pub struct RoomToolHandle {
+    axis: HandleAxis,
+}
+
+#[derive(PartialEq, Eq, Clone, Copy)]
+pub enum HandleAxis {
+    MinX,
+    MinY,
+    MinZ,
+    MaxX,
+    MaxY,
+    MaxZ,
+}
 
 #[derive(Component)]
 pub struct Room {
