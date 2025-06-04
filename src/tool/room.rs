@@ -79,12 +79,15 @@ impl Default for RoomTool {
 }
 
 impl RoomTool {
-    fn init(mut commands: Commands, mut tool: ResMut<Self>) {
+    fn init(
+        mut commands: Commands,
+        mut tool: ResMut<Self>,
+        mut meshes: ResMut<Assets<Mesh>>,
+        mut materials: ResMut<Assets<StandardMaterial>>,
+    ) {
         let min = Vec3::new(-1.0, 0.0, -1.0);
         let max = Vec3::new(1.0, 2.0, 1.0);
-        commands.spawn((
-            Room::new(min, max),
-        ));
+        Room::new(min, max).spawn(&mut commands, meshes, materials);
         tool.last_min = min;
         tool.last_max = max;
     }
@@ -109,14 +112,14 @@ impl RoomTool {
         mut commands: Commands,
         keyboard_input: Res<CurrentKeyboardInput>,
         mut create_events: EventReader<CreateRoom>,
+        meshes: ResMut<Assets<Mesh>>,
+        materials: ResMut<Assets<StandardMaterial>>,
     ) {
         if !create_events.is_empty() || keyboard_input.confirm {
             create_events.clear();
             let new_room = tool.create();
             if let Some(new_room) = new_room {
-                commands.spawn((
-                    new_room,
-                ));
+                new_room.spawn(&mut commands, meshes, materials);
             }
         }
     }
@@ -638,6 +641,102 @@ impl Room {
             max,
             ghost: None,
         }
+    }
+    
+    pub fn spawn(
+        self, commands: &mut Commands,
+        mut meshes: ResMut<Assets<Mesh>>,
+        mut materials: ResMut<Assets<StandardMaterial>>,
+    ) {
+        let mesh = meshes.add(self.mesh());
+        let material = materials.add(StandardMaterial {
+            base_color: Color::srgb_u8(255, 255, 255),
+            ..Default::default()
+        });
+        commands.spawn((
+            self,
+            Mesh3d(mesh),
+            MeshMaterial3d(material),
+            ));
+    }
+    
+    pub fn mesh(&self) -> Mesh {
+        // Create a mesh which is a rectangular prism
+        // with two corners self.min and self.max
+        // the faces have their normals facing inward.
+        
+        let min = self.min;
+        let max = self.max;
+        
+        // Define the 8 vertices of the box
+        let vertices = vec![
+            // Front face (z = min.z)
+            [min.x, min.y, min.z], // 0: bottom-left-front
+            [max.x, min.y, min.z], // 1: bottom-right-front
+            [max.x, max.y, min.z], // 2: top-right-front
+            [min.x, max.y, min.z], // 3: top-left-front
+            // Back face (z = max.z)
+            [min.x, min.y, max.z], // 4: bottom-left-back
+            [max.x, min.y, max.z], // 5: bottom-right-back
+            [max.x, max.y, max.z], // 6: top-right-back
+            [min.x, max.y, max.z], // 7: top-left-back
+        ];
+        
+        // Define indices for triangles with inward-facing normals
+        // (counter-clockwise winding when viewed from inside)
+        let indices = vec![
+            // Front face (z = min.z) - normal points toward +z (inward)
+            0, 1, 2, 0, 2, 3,
+            // Back face (z = max.z) - normal points toward -z (inward)
+            4, 6, 5, 4, 7, 6,
+            // Left face (x = min.x) - normal points toward +x (inward)
+            4, 0, 3, 4, 3, 7,
+            // Right face (x = max.x) - normal points toward -x (inward)
+            1, 5, 2, 5, 6, 2,
+            // Bottom face (y = min.y) - normal points toward +y (inward)
+            4, 1, 0, 4, 5, 1,
+            // Top face (y = max.y) - normal points toward -y (inward)
+            3, 2, 6, 3, 6, 7,
+        ];
+        
+        // Calculate inward-facing normals for each vertex
+        // Since we want inward normals, we negate the typical outward normals
+        let normals = vec![
+            // Front face vertices - inward normal is +z
+            [0.0, 0.0, 1.0], // 0
+            [0.0, 0.0, 1.0], // 1
+            [0.0, 0.0, 1.0], // 2
+            [0.0, 0.0, 1.0], // 3
+            // Back face vertices - inward normal is -z
+            [0.0, 0.0, -1.0], // 4
+            [0.0, 0.0, -1.0], // 5
+            [0.0, 0.0, -1.0], // 6
+            [0.0, 0.0, -1.0], // 7
+        ];
+        
+        // Simple UV coordinates - could be improved for better texture mapping
+        let uvs = vec![
+            [0.0, 0.0], // 0
+            [1.0, 0.0], // 1
+            [1.0, 1.0], // 2
+            [0.0, 1.0], // 3
+            [0.0, 0.0], // 4
+            [1.0, 0.0], // 5
+            [1.0, 1.0], // 6
+            [0.0, 1.0], // 7
+        ];
+        
+        let mut mesh = Mesh::new(
+            bevy::render::render_resource::PrimitiveTopology::TriangleList,
+            bevy::render::render_asset::RenderAssetUsages::default(),
+        );
+        
+        mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, vertices);
+        mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
+        mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
+        mesh.insert_indices(bevy::render::mesh::Indices::U32(indices));
+        
+        mesh
     }
     
     pub fn messages(&self, my_entity: Entity) -> Vec<String> {
