@@ -413,7 +413,7 @@ impl RoomTool {
                                 tool.drag_handle_start = Some(tfm.translation);
                             }
                         }
-                    } else {
+                    } else { // This is for when the mouse is released
                         tool.drag_start = None;
                         tool.drag_handle_entity = None;
                         tool.drag_handle_start = None;
@@ -424,7 +424,6 @@ impl RoomTool {
                     commands.entity(*hit_entity)
                         .remove::<MeshMaterial3d<StandardMaterial>>()
                         .insert(MeshMaterial3d(highlight));
-
                     for (handle_entity, handle, tfm) in &mut handles {
                         if handle_entity != *hit_entity {
                             commands.entity(handle_entity)
@@ -456,7 +455,7 @@ impl RoomTool {
                 }
             }
         }
-
+        
         if let (Some(drag_start), Some(drag_handle_entity), Some(drag_handle_start)) = (tool.drag_start, tool.drag_handle_entity, tool.drag_handle_start) {
             let cursor_point = match cursor_point {
                 Some(point) => Some(point),
