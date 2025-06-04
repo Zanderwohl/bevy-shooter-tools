@@ -397,6 +397,8 @@ impl RoomTool {
         
         let filter = |entity| handles.get(entity).is_ok();
         let settings = MeshRayCastSettings::default().with_filter(&filter);
+        
+        let mut cursor_point = None;
 
         if let (Some(idle), Some(highlight)) = (tool.handle_idle_material.clone(), tool.handle_highlight_material.clone()) {
             if let Some(ray) = mouse_input.world_pos {
@@ -416,6 +418,8 @@ impl RoomTool {
                         tool.drag_handle_entity = None;
                         tool.drag_handle_start = None;
                     }
+                    
+                    cursor_point = Some(hit_data.point);
 
                     commands.entity(*hit_entity)
                         .remove::<MeshMaterial3d<StandardMaterial>>()
@@ -428,99 +432,18 @@ impl RoomTool {
                                 .insert(MeshMaterial3d(idle.clone()));
                         }
                     }
-
-                    if let (Some(drag_start), Some(drag_handle_entity), Some(drag_handle_start)) = (tool.drag_start, tool.drag_handle_entity, tool.drag_handle_start) {
-                        let diff = drag_start - hit_data.point;
-                        for (handle_entity, handle, mut tfm) in &mut handles {
-                            if handle_entity == *hit_entity {
-                                info!("{}", diff);
-                                let active_min = tool.active_min.clone().unwrap();
-                                let active_max = tool.active_max.clone().unwrap();
-                                let g = tool.snap_granularity;
-                                match &handle.axis {
-                                    HandleAxis::MinX => {
-                                        let new_x = f32::min(f32::ceil((drag_handle_start.x - diff.x) / g) * g, active_max.x - g);
-                                        info!("{}", new_x);
-                                        tool.active_min = Some(Vec3::new(
-                                            new_x,
-                                            active_min.y,
-                                            active_min.z,
-                                        ));
-                                        tfm.translation.x = new_x;
-                                    },
-                                    HandleAxis::MaxX => {
-                                        let new_x = f32::max(f32::ceil((drag_handle_start.x - diff.x) / g) * g, active_min.x + g);
-                                        info!("{}", new_x);
-                                        tool.active_max = Some(Vec3::new(
-                                           new_x,
-                                           active_max.y,
-                                           active_max.z,
-                                        ));
-                                        tfm.translation.x = new_x;
-                                    },
-                                    HandleAxis::MinY => {
-                                        let new_y = f32::min(f32::ceil((drag_handle_start.y - diff.y) / g) * g, active_max.y - g);
-                                        info!("{}", new_y);
-                                        tool.active_min = Some(Vec3::new(
-                                            active_min.x,
-                                            new_y,
-                                            active_min.z,
-                                        ));
-                                        tfm.translation.y = new_y;
-                                    },
-                                    HandleAxis::MaxY => {
-                                        let new_y = f32::max(f32::ceil((drag_handle_start.y - diff.y) / g) * g, active_min.y + g);
-                                        info!("{}", new_y);
-                                        tool.active_max = Some(Vec3::new(
-                                            active_max.x,
-                                            new_y,
-                                            active_max.z,
-                                        ));
-                                        tfm.translation.y = new_y;
-                                    },
-                                    HandleAxis::MinZ => {
-                                        let new_z = f32::min(f32::ceil((drag_handle_start.z - diff.z) / g) * g, active_max.z - g);
-                                        info!("{}", new_z);
-                                        tool.active_min = Some(Vec3::new(
-                                            active_min.x,
-                                            active_min.y,
-                                            new_z,
-                                        ));
-                                        tfm.translation.z = new_z;
-                                    },
-                                    HandleAxis::MaxZ => {
-                                        let new_z = f32::max(f32::ceil((drag_handle_start.z - diff.z) / g) * g, active_min.z + g);
-                                        info!("{}", new_z);
-                                        tool.active_max = Some(Vec3::new(
-                                            active_max.x,
-                                            active_max.y,
-                                            new_z,
-                                        ));
-                                        tfm.translation.z = new_z;
-                                    },
-                                    _ => {}
-                                };
-                                // TODO tfm.translation = 
-                            }
-                        }
-                        let points = tool.face_centers();
-                        for (handle_entity, handle, mut tfm) in &mut handles {
-                            for (a, b) in &points {
-                                if b == &handle.axis {
-                                    tfm.translation = *a;
-                                }
-                            }
-                        }
-                    }
                 } else { // This occurs when the ray hits nothing.
-                    tool.drag_start = None;
-                    tool.drag_handle_entity = None;
-                    tool.drag_handle_start = None;
-                    for (handle, _, _) in &handles {
-                        commands.entity(handle)
-                            .remove::<MeshMaterial3d<StandardMaterial>>()
-                            .insert(MeshMaterial3d(idle.clone()));
+                    if mouse_input.pressed == None {
+                        tool.drag_start = None;
+                        tool.drag_handle_entity = None;
+                        tool.drag_handle_start = None;
+                        for (handle, _, _) in &handles {
+                            commands.entity(handle)
+                                .remove::<MeshMaterial3d<StandardMaterial>>()
+                                .insert(MeshMaterial3d(idle.clone()));
+                        }
                     }
+                    
                 }
             } else { // this occurs when the mouse is outside and there is no ray.
                 tool.drag_start = None;
@@ -533,6 +456,94 @@ impl RoomTool {
                 }
             }
         }
+
+        if let (Some(drag_start), Some(drag_handle_entity), Some(drag_handle_start)) = (tool.drag_start, tool.drag_handle_entity, tool.drag_handle_start) {
+            let cursor_point = cursor_point.unwrap_or_else(|| {
+                mouse_input.world_pos.map(|ray| { ray.origin }).unwrap_or_default()
+            });
+            let diff = drag_start - cursor_point;
+            for (handle_entity, handle, mut tfm) in &mut handles {
+                if handle_entity == drag_handle_entity {
+                    info!("{}", diff);
+                    let active_min = tool.active_min.clone().unwrap();
+                    let active_max = tool.active_max.clone().unwrap();
+                    let g = tool.snap_granularity;
+                    match &handle.axis {
+                        HandleAxis::MinX => {
+                            let new_x = f32::min(f32::ceil((drag_handle_start.x - diff.x) / g) * g, active_max.x - g);
+                            info!("{}", new_x);
+                            tool.active_min = Some(Vec3::new(
+                                new_x,
+                                active_min.y,
+                                active_min.z,
+                            ));
+                            tfm.translation.x = new_x;
+                        },
+                        HandleAxis::MaxX => {
+                            let new_x = f32::max(f32::ceil((drag_handle_start.x - diff.x) / g) * g, active_min.x + g);
+                            info!("{}", new_x);
+                            tool.active_max = Some(Vec3::new(
+                                new_x,
+                                active_max.y,
+                                active_max.z,
+                            ));
+                            tfm.translation.x = new_x;
+                        },
+                        HandleAxis::MinY => {
+                            let new_y = f32::min(f32::ceil((drag_handle_start.y - diff.y) / g) * g, active_max.y - g);
+                            info!("{}", new_y);
+                            tool.active_min = Some(Vec3::new(
+                                active_min.x,
+                                new_y,
+                                active_min.z,
+                            ));
+                            tfm.translation.y = new_y;
+                        },
+                        HandleAxis::MaxY => {
+                            let new_y = f32::max(f32::ceil((drag_handle_start.y - diff.y) / g) * g, active_min.y + g);
+                            info!("{}", new_y);
+                            tool.active_max = Some(Vec3::new(
+                                active_max.x,
+                                new_y,
+                                active_max.z,
+                            ));
+                            tfm.translation.y = new_y;
+                        },
+                        HandleAxis::MinZ => {
+                            let new_z = f32::min(f32::ceil((drag_handle_start.z - diff.z) / g) * g, active_max.z - g);
+                            info!("{}", new_z);
+                            tool.active_min = Some(Vec3::new(
+                                active_min.x,
+                                active_min.y,
+                                new_z,
+                            ));
+                            tfm.translation.z = new_z;
+                        },
+                        HandleAxis::MaxZ => {
+                            let new_z = f32::max(f32::ceil((drag_handle_start.z - diff.z) / g) * g, active_min.z + g);
+                            info!("{}", new_z);
+                            tool.active_max = Some(Vec3::new(
+                                active_max.x,
+                                active_max.y,
+                                new_z,
+                            ));
+                            tfm.translation.z = new_z;
+                        },
+                        _ => {}
+                    };
+                    // TODO tfm.translation = 
+                }
+            }
+            let points = tool.face_centers();
+            for (handle_entity, handle, mut tfm) in &mut handles {
+                for (a, b) in &points {
+                    if b == &handle.axis {
+                        tfm.translation = *a;
+                    }
+                }
+            }
+        }
+        
     }
 
     fn confirm_window(
