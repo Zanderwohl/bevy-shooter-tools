@@ -10,6 +10,7 @@ pub struct Item {
     stat_tracker: Option<StatTracker>,
     particle_effect: Option<Arc<ParticleEffect>>,
     trade_restriction: bool,
+    crafting_restriction: bool,
     destroyed: bool,
 }
 
@@ -75,6 +76,10 @@ impl Item {
     pub fn destroy(&mut self) {
         self.destroyed = true;
     }
+    
+    pub fn can_craft(&self) -> bool {
+        self.prototype.craftable() && !self.crafting_restriction
+    }
 }
 
 #[derive(Clone)]
@@ -99,6 +104,8 @@ impl Prototype {
     pub fn tradeable(&self) -> bool {
         !self.trade_restriction && !self.stock
     }
+    
+    pub fn craftable(&self) -> bool { !self.stock }
 }
 
 #[derive(Clone)]
