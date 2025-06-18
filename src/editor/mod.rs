@@ -1,3 +1,3 @@
 pub mod multicam;
 pub mod input;
-mod editable;
+pub mod editable;
