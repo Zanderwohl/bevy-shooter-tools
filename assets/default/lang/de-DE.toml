@@ -35,11 +35,11 @@ orthographic.scroll = "Orthografische Kamera-Scroll-Geschwindigkeit"
 title = "Werkzeuge"
 select = "Auswählen"
 move = "Bewegen"
-room = "Raum"
+room = "Zimmer"
 
 [bakes]
 title = "Bake-Operationen"
-room_geometry = "Raumgeometrie"
+room_geometry = "Zimmergeometrie"
 
 [show]
 title = "Anzeigen/Verstecken"
@@ -48,14 +48,14 @@ ortho_cameras = "Orthografische Kameras"
 perspective_cameras = "Perspektivkameras"
 
 [room.messages]
-ghost = "Raum { me } ist vollständig in { other } enthalten und wird nicht angezeigt!"
+ghost = "Zimmer { me } ist vollständig in { other } enthalten und wird nicht angezeigt!"
 
 [room.confirm]
-title = "Raum-Ersteller"
+title = "Zimmer-Ersteller"
 confirm = "Bestätigen"
 
 [debug.room]
-title = "Raum-Werkzeug Debug"
+title = "Zimmer-Werkzeug Debug"
 state = "Aktueller Werkzeugzustand"
 last_min = "Letztes Min: { x }"
 last_max = "Letztes Max: { x }"
@@ -64,7 +64,7 @@ active_max = "Aktives Max: { x }"
 show_points = "Punkte anzeigen"
 show_cursor = "Kamera-Weltkoordinaten-Cursor anzeigen"
 invalid_cursor = "Cursor befindet sich in einem ungültigen Zustand!"
-missing_material = "Raum-Werkzeug geriet in einen ungültigen Zustand mit fehlenden Material-Handles!"
+missing_material = "Zimmer-Werkzeug geriet in einen ungültigen Zustand mit fehlenden Material-Handles!"
 gizmos = "Gizmos"
 
 [debug.room.snap]
