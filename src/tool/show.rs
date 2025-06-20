@@ -22,7 +22,7 @@ impl ShowPlugin {
         if ctx.is_none() { return; }
         let ctx = ctx.unwrap();
         
-        egui::Window::new("Show").show(ctx, |ui| {
+        egui::Window::new(get!("show.title")).show(ctx, |ui| {
             ui.heading(get!("show.cameras"));
             ui.checkbox(&mut multicam_state.draw_ortho_cameras, get!("show.ortho_cameras"));
             ui.checkbox(&mut multicam_state.draw_perspective_cameras, get!("show.perspective_cameras"));
