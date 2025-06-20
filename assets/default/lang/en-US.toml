@@ -1,5 +1,6 @@
 [editor]
-title = "Bevy Shooter Tools Level Editor"
+title = "Grackle Level Editor"
+title_special = "{ game } Grackle Level Editor"
 
 [viewport]
 free = "Freecam"

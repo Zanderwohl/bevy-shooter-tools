@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fs;
 use std::sync::{RwLock};
-
+use bevy::prelude::info;
 use lazy_static::lazy_static;
 use toml::Value;
 use regex::Regex;
@@ -33,6 +33,9 @@ pub fn change_lang(lang: &str) -> Result<(), String> {
 
 fn load_lang(lang: &str) -> Value {
     let pack = "default";
+    
+    info!("Loading pack {} in lang {}", pack, lang);
+    
     let lang_path = format!("assets/{}/lang/{}.toml", pack, lang);
     let toml_str = fs::read_to_string(&lang_path)
         .expect(format!("Lang file \"{}\" not found!", lang_path).as_str());

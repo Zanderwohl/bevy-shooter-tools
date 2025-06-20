@@ -1,0 +1,82 @@
+[editor]
+title = "Grackle Level Editor"
+
+[viewport]
+free = "Freie Kamera"
+front = "Vorne"
+top = "Oben"
+right = "Rechts"
+ui = "UI-Kamera"
+
+[debug.viewport]
+title = "Multicam-Ansicht"
+controls = "Steuerung zusammendrücken"
+start = "Start"
+end = "Ende"
+
+[debug.viewport.draw]
+title = "Debug-Indikatoren zeichnen"
+mouse = "Mauskreis"
+box = "Ansichtsrahmen"
+mouseover = "Mouseover-Rahmen"
+probe = "Maus-Sonde"
+
+[debug.movement]
+title = "Kamerabewegung"
+perspective.title = "Perspektivkamera-Einstellungen"
+perspective.pan = "Perspektivkamera-Schwenkfaktor"
+perspective.rotate = "Perspektivkamera-Rotationsfaktor"
+perspective.speed = "Perspektivkamera-Geschwindigkeit"
+perspective.scroll = "Perspektivkamera-Scroll-Geschwindigkeit"
+orthographic.title = "Orthografische Kamera-Einstellungen"
+orthographic.scroll = "Orthografische Kamera-Scroll-Geschwindigkeit"
+
+[tools]
+title = "Werkzeuge"
+select = "Auswählen"
+move = "Bewegen"
+room = "Raum"
+
+[bakes]
+title = "Bake-Operationen"
+room_geometry = "Raumgeometrie"
+
+[show]
+title = "Anzeigen/Verstecken"
+cameras = "Kameras"
+ortho_cameras = "Orthografische Kameras"
+perspective_cameras = "Perspektivkameras"
+
+[room.messages]
+ghost = "Raum { me } ist vollständig in { other } enthalten und wird nicht angezeigt!"
+
+[room.confirm]
+title = "Raum-Ersteller"
+confirm = "Bestätigen"
+
+[debug.room]
+title = "Raum-Werkzeug Debug"
+state = "Aktueller Werkzeugzustand"
+last_min = "Letztes Min: { x }"
+last_max = "Letztes Max: { x }"
+active_min = "Aktives Min: { x }"
+active_max = "Aktives Max: { x }"
+show_points = "Punkte anzeigen"
+show_cursor = "Kamera-Weltkoordinaten-Cursor anzeigen"
+invalid_cursor = "Cursor befindet sich in einem ungültigen Zustand!"
+missing_material = "Raum-Werkzeug geriet in einen ungültigen Zustand mit fehlenden Material-Handles!"
+gizmos = "Gizmos"
+
+[debug.room.snap]
+title = "Einrasten"
+granularity = "Granularität"
+active = "Am Raster einrasten"
+
+[editor.timeline]
+title = "Zeitleiste"
+
+[editor.actions.global_point]
+title = "Globaler Punkt"
+
+[editor.actions.cuboid]
+title = "Quader"
