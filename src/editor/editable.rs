@@ -30,6 +30,7 @@ pub trait EditorObject: Send + Sync {
     fn get_point(&self, key: &str) -> Result<Vec3, PointResolutionError>;
     fn editor_ui(&mut self, ctx: &mut Context);
     fn type_name(&self) -> String;
+    fn debug_gizmos(&self, gizmos: &mut Gizmos);
 }
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Debug, Clone, Copy)]
@@ -88,12 +89,14 @@ impl EditorActions {
     pub fn ui(
         mut contexts: EguiContexts,
         mut actions: ResMut<Self>,
+        mut gizmos: Gizmos,
     ) {
         let ctx = contexts.try_ctx_mut();
         if ctx.is_none() { return; }
         let ctx = ctx.unwrap();
 
-        let mut next_selected = None;
+        let mut selection_changed = false;
+        let mut next_selected = actions.selected_action;
 
         egui::Window::new(get!("editor.timeline.title")).show(ctx, |ui| {
             egui::ScrollArea::vertical().show(ui, |ui| {
@@ -103,19 +106,26 @@ impl EditorActions {
                     
                     if ui.add_sized([ui.available_width(), 0.0], 
                         egui::SelectableLabel::new(is_selected, action.type_name_with_id())).clicked() {
-                        next_selected = Some(*id);
+                        if is_selected {
+                            next_selected = None;
+                        } else {
+                            next_selected = Some(*id);
+                        }
+                        selection_changed = true;
                     }
                 }
             });
         });
 
-        if let Some(selected_id) = next_selected {
-            actions.selected_action = Some(selected_id);
+        if selection_changed {
+            actions.selected_action = next_selected;
         }
         
         if let Some(selected_id) = actions.selected_action {
             let mut action = actions.actions.get_mut(&selected_id).unwrap();
             action.object.editor_ui(ctx);
+            
+            action.object.debug_gizmos(&mut gizmos);
         }
     }
 }

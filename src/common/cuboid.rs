@@ -135,4 +135,8 @@ impl EditorObject for GrackleCuboid {
     fn type_name(&self) -> String {
         get!("editor.actions.cuboid.title")
     }
+    
+    fn debug_gizmos(&self, _gizmos: &mut Gizmos) {
+        todo!()
+    }
 }
