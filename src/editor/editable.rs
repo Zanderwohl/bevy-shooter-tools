@@ -99,18 +99,12 @@ impl EditorActions {
             egui::ScrollArea::vertical().show(ui, |ui| {
                 for id in actions.action_order.iter() {
                     let action = actions.get_action(id).unwrap();
-                    ui.group(|ui| {
-                        if let Some(selected_id) = actions.selected_action {
-                            if *id == selected_id {
-                                ui.disable();
-                            }
-                        }
-
-                        if ui.button(action.type_name()).clicked() {
-                            next_selected = Some(*id);
-                        }
-                    });
+                    let is_selected = actions.selected_action == Some(*id);
                     
+                    if ui.add_sized([ui.available_width(), 0.0], 
+                        egui::SelectableLabel::new(is_selected, action.type_name_with_id())).clicked() {
+                        next_selected = Some(*id);
+                    }
                 }
             });
         });
@@ -132,6 +126,12 @@ impl EditorActionId {
     }
 }
 
+impl std::fmt::Display for EditorActionId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self._id)
+    }
+}
+
 // Essentially, these are nodes on a directed acyclic graph.
 // Editor actions may depend on previous actions to resolve.
 // They may also not depend on anything, with all descendants tracing their ancestry back --
@@ -150,6 +150,10 @@ impl EditorAction {
     
     pub fn type_name(&self) -> String {
         self.object.type_name()
+    }
+    
+    pub fn type_name_with_id(&self) -> String {
+        format!("{} {}", self.object.type_name(), self.id)
     }
 }
 
