@@ -14,7 +14,6 @@ impl Plugin for RoomPlugin {
     fn build(&self, app: &mut App) {
         app
             .init_resource::<RoomTool>()
-            .add_event::<CalculateRoomGeometry>()
             .add_event::<CreateRoom>()
             .add_systems(EguiContextPass, (
                 RoomTool::debug_window,

@@ -9,6 +9,7 @@ use bevy_egui::{EguiPlugin};
 use bevy_vector_shapes::prelude::*;
 use crate::common::lang::change_lang;
 use crate::common::perf::PerfPlugin;
+use crate::editor::editable::EditorStepsPlugin;
 use crate::editor::input::EditorInputPlugin;
 use crate::editor::multicam::MulticamPlugin;
 use crate::tool::ToolPlugin;
@@ -50,6 +51,7 @@ fn main() {
             MulticamPlugin {
                 test_scene: false,
             },
+            EditorStepsPlugin,
             ToolPlugin,
             PerfPlugin,
             ))

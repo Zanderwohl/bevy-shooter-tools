@@ -71,3 +71,12 @@ gizmos = "Gizmos"
 title = "Snap"
 granularity = "Granularity"
 active = "Snap to grid"
+
+[editor.timeline]
+title = "Timeline"
+
+[editor.actions.global_point]
+title = "Global Point"
+
+[editor.actions.cuboid]
+title = "Cuboid"

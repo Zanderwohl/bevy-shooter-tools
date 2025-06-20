@@ -1,9 +1,13 @@
 use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
+use bevy_egui::{egui, EguiContextPass, EguiContexts};
+use bevy_egui::egui::{Context, Widget};
 use lazy_static::lazy_static;
 use serde::{Serialize, Deserialize};
-use crate::common::cuboid::CuboidPoint;
+use crate::common::cuboid::{CuboidPoint, GrackleCuboid};
 use crate::common::PointResolutionError;
+use crate::editor::global_point::GlobalPoint;
+use crate::get;
 
 lazy_static! {
     static ref MAP_EXT: String = "gmp".to_owned(); // Grackle MaP
@@ -11,10 +15,21 @@ lazy_static! {
 }
 
 
+pub struct EditorStepsPlugin;
+impl Plugin for EditorStepsPlugin {
+    fn build(&self, app: &mut App) {
+        app
+            .init_resource::<EditorActions>()
+            .add_systems(EguiContextPass, EditorActions::ui)
+        ;
+    }
+}
 
 #[typetag::serde]
 pub trait EditorObject: Send + Sync {
     fn get_point(&self, key: &str) -> Result<Vec3, PointResolutionError>;
+    fn editor_ui(&mut self, ctx: &mut Context);
+    fn type_name(&self) -> String;
 }
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Debug, Clone, Copy)]
@@ -26,15 +41,25 @@ pub struct EditorActionId {
 #[derive(Resource)]
 pub struct EditorActions {
     actions: HashMap<EditorActionId, EditorAction>,
+    action_order: Vec<EditorActionId>,
     id_counter: u64,
+    selected_action: Option<EditorActionId>,
 }
 
 impl Default for EditorActions {
     fn default() -> Self {
-        Self {
+        let mut a = Self {
             actions: HashMap::new(),
+            action_order: vec![],
             id_counter: 0,
-        }
+            selected_action: None,
+        };
+        
+        a.take_action(Box::new(GlobalPoint::new(0.0, 0.0, 0.0)));
+        a.take_action(Box::new(GlobalPoint::new(1.0, 0.0, 0.0)));
+        a.take_action(Box::new(GlobalPoint::new(0.0, 5.0, 0.0)));
+        
+        a
     }
 }
 
@@ -46,16 +71,58 @@ impl EditorActions {
     }
     
     pub fn take_action(&mut self, object: Box<dyn EditorObject>) {
+        let new_id = self.next_id();
         let new_action = EditorAction {
-            id: self.next_id(),
+            id: new_id,
             object,
             parents: vec![],
         };
         self.actions.insert(new_action.id, new_action);
+        self.action_order.push(new_id);
     }
     
     pub fn get_action(&self, id: &EditorActionId) -> Option<&EditorAction> {
         self.actions.get(id)
+    }
+    
+    pub fn ui(
+        mut contexts: EguiContexts,
+        mut actions: ResMut<Self>,
+    ) {
+        let ctx = contexts.try_ctx_mut();
+        if ctx.is_none() { return; }
+        let ctx = ctx.unwrap();
+
+        let mut next_selected = None;
+
+        egui::Window::new(get!("editor.timeline.title")).show(ctx, |ui| {
+            egui::ScrollArea::vertical().show(ui, |ui| {
+                for id in actions.action_order.iter() {
+                    let action = actions.get_action(id).unwrap();
+                    ui.group(|ui| {
+                        if let Some(selected_id) = actions.selected_action {
+                            if *id == selected_id {
+                                ui.disable();
+                            }
+                        }
+
+                        if ui.button(action.type_name()).clicked() {
+                            next_selected = Some(*id);
+                        }
+                    });
+                    
+                }
+            });
+        });
+
+        if let Some(selected_id) = next_selected {
+            actions.selected_action = Some(selected_id);
+        }
+        
+        if let Some(selected_id) = actions.selected_action {
+            let mut action = actions.actions.get_mut(&selected_id).unwrap();
+            action.object.editor_ui(ctx);
+        }
     }
 }
 
@@ -79,6 +146,10 @@ pub struct EditorAction {
 impl EditorAction {
     pub fn get_point(&self, key: &str) -> Result<Vec3, PointResolutionError> {
         self.object.get_point(key)
+    }
+    
+    pub fn type_name(&self) -> String {
+        self.object.type_name()
     }
 }
 

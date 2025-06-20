@@ -1,8 +1,11 @@
 use bevy::prelude::*;
+use bevy_egui::egui;
+use bevy_egui::egui::{Context, Ui};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use crate::common::PointResolutionError;
 use crate::editor::editable::EditorObject;
+use crate::get;
 
 lazy_static! {
     static ref PLANE_CENTERS: [CuboidPoint; 6] = {
@@ -101,12 +104,12 @@ impl CuboidPoint {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct Cuboid {
+pub struct GrackleCuboid {
     min: Vec3,
     max: Vec3,
 }
 
-impl Cuboid {
+impl GrackleCuboid {
     pub fn new(min: Vec3, max: Vec3) -> Self {
         Self { min, max }
     }
@@ -117,9 +120,19 @@ impl Cuboid {
 }
 
 #[typetag::serde(name = "cuboid")]
-impl EditorObject for Cuboid {
+impl EditorObject for GrackleCuboid {
     fn get_point(&self, point: &str) -> Result<Vec3, PointResolutionError> {
         todo!()
         //Ok(point.resolve_in_bounds(self.min, self.max))
+    }
+
+    fn editor_ui(&mut self, ctx: &mut Context) {
+        egui::Window::new(self.type_name()).show(ctx, |ui| {
+
+        });
+    }
+
+    fn type_name(&self) -> String {
+        get!("editor.actions.cuboid.title")
     }
 }

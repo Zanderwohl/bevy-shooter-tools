@@ -9,6 +9,7 @@ impl Plugin for BakePlugin {
     fn build(&self, app: &mut App) {
         app
             .add_systems(EguiContextPass, Self::bake_ui)
+            .add_event::<CalculateRoomGeometry>()
         ;
     }
 }

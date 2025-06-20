@@ -27,7 +27,7 @@ impl Plugin for ToolPlugin {
             .add_plugins(BakePlugin)
             .add_plugins(MovementPlugin)
             .add_plugins(SelectionPlugin)
-            .add_plugins(RoomPlugin)
+            // .add_plugins(RoomPlugin)
             .add_systems(EguiContextPass, Self::toolbar)
         ;
     }
