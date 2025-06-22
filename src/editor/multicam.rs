@@ -316,7 +316,7 @@ impl MulticamPlugin {
             (state.start.x * window_size.x as f32) as u32,
             (state.start.y * window_size.y as f32) as u32,
         );
-
+        
         // Calculate the size of each camera's viewport (2x2 grid)
         let camera_size = UVec2::new(
             viewport_size.x / 2,
