@@ -2,10 +2,50 @@ use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use bevy_egui::{egui, EguiContext, EguiContextPass, EguiContexts};
-use bevy_egui::egui::Ui;
+use bevy_egui::egui::{Ui, WidgetText};
+use egui_dock::{DockArea, DockState, TabViewer};
 use strum_macros::Display;
+use crate::editor::editable::EditorActions;
 use crate::editor::multicam::MulticamState;
+use crate::tool::Tools;
 
+enum TabKinds {
+    Empty(String),
+    Tools,
+    Timeline,
+}
+
+struct TabViewerAndResources<'a> {
+    current_tool: &'a State<Tools>,
+    next_tool: &'a mut NextState<Tools>,
+    editor_actions: &'a mut EditorActions,
+}
+
+impl<'a> TabViewer for TabViewerAndResources<'a> {
+    type Tab = TabKinds;
+
+    fn title(&mut self, tab: &mut Self::Tab) -> WidgetText {
+        match tab {
+            TabKinds::Empty(name) => { name.as_str().into() }
+            TabKinds::Tools => { "Tools".into() }
+            TabKinds::Timeline => { "Timeline".into() }
+        }
+    }
+
+    fn ui(&mut self, ui: &mut Ui, tab: &mut Self::Tab) {
+        match tab {
+            TabKinds::Empty(name) => {
+                ui.label(format!("Empty: {}", name));
+            }
+            TabKinds::Tools => {
+                ui.label("Tools.");
+            }
+            TabKinds::Timeline => {
+                ui.label("Timeline.");
+            }
+        }
+    }
+}
 
 pub struct EditorPanelPlugin;
 impl Plugin for EditorPanelPlugin {
@@ -28,10 +68,14 @@ pub enum EditorPanelLocation {
 
 #[derive(Resource)]
 pub struct EditorPanels {
+    top_tabs: DockState<TabKinds>,
     toolbar_height: f32,
     top_height: f32,
+    bottom_tabs: DockState<TabKinds>,
     bottom_height: f32,
+    left_tabs: DockState<TabKinds>,
     left_width: f32,
+    right_tabs: DockState<TabKinds>,
     right_width: f32,
 }
 
@@ -49,27 +93,53 @@ impl Default for EditorPanels {
 
 impl EditorPanels {
     pub fn new() -> Self {
+        let default_top_tabs = vec![TabKinds::Tools];
+        let default_left_tabs = vec![TabKinds::Timeline, TabKinds::Empty("Alpha".to_owned())];
+        let default_right_tabs = vec![TabKinds::Empty("Beta".to_owned()), TabKinds::Empty("Gamma".to_owned())];
+        let default_bottom_tabs = vec![TabKinds::Empty("Delta".to_owned()), TabKinds::Empty("Epsilon".to_owned())];
+        
         Self {
+            top_tabs: DockState::new(default_top_tabs),
             toolbar_height: 20.0,
             top_height: 40.0,
+            bottom_tabs: DockState::new(default_bottom_tabs),
             bottom_height: 30.0,
+            left_tabs: DockState::new(default_left_tabs),
             left_width: 40.0,
+            right_tabs: DockState::new(default_right_tabs),
             right_width: 40.0,
         }
     }
 
-    fn ui(mut panels: ResMut<Self>, mut contexts: EguiContexts, multicam_state: ResMut<MulticamState>, windows: Query<&Window, With<PrimaryWindow>>) -> Result{
+    fn ui(
+        mut panels: ResMut<Self>,
+        mut contexts: EguiContexts,
+        multicam_state: ResMut<MulticamState>,
+        windows: Query<&Window, With<PrimaryWindow>>,
+        
+        current_tool: Res<State<Tools>>,
+        mut next_tool: ResMut<NextState<Tools>>,
+        mut editor_actions: ResMut<EditorActions>,
+    ) -> Result{
         let ctx = contexts.try_ctx_mut();
         if ctx.is_none() {
             return Ok(());
         }
         let ctx = ctx.unwrap();
+        
+        let mut viewer = TabViewerAndResources {
+            current_tool: & *current_tool,
+            next_tool: &mut *next_tool,
+            editor_actions: &mut *editor_actions,
+        };
 
         panels.top_height = egui::TopBottomPanel::top("top_panel")
             .resizable(true)
             .show(ctx, |ui| {
-                Self::ui_for_panel(ui);
-                ui.allocate_rect(ui.available_rect_before_wrap(), egui::Sense::hover());
+                DockArea::new(&mut panels.top_tabs)
+                    .id(egui::Id::new("egui_dock::DockArea::top"))
+                    .show_inside(ui, &mut viewer);
+                //ui.allocate_rect(ui.available_rect_before_wrap(), egui::Sense::hover());
             })
             .response
             .rect
@@ -77,7 +147,9 @@ impl EditorPanels {
         panels.left_width = egui::SidePanel::left("left_panel")
             .resizable(true)
             .show(ctx, |ui| {
-                Self::ui_for_panel(ui);
+                DockArea::new(&mut panels.left_tabs)
+                    .id(egui::Id::new("egui_dock::DockArea::left"))
+                    .show_inside(ui, &mut viewer);
                 ui.allocate_rect(ui.available_rect_before_wrap(), egui::Sense::hover());
             })
             .response
@@ -86,7 +158,9 @@ impl EditorPanels {
         panels.right_width = egui::SidePanel::right("right_panel")
             .resizable(true)
             .show(ctx, |ui| {
-                Self::ui_for_panel(ui);
+                DockArea::new(&mut panels.right_tabs)
+                    .id(egui::Id::new("egui_dock::DockArea::right"))
+                    .show_inside(ui, &mut viewer);
                 ui.allocate_rect(ui.available_rect_before_wrap(), egui::Sense::hover());
             })
             .response
@@ -95,8 +169,10 @@ impl EditorPanels {
         panels.bottom_height = egui::TopBottomPanel::bottom("bottom_panel")
             .resizable(true)
             .show(ctx, |ui| {
-                Self::ui_for_panel(ui);
-                ui.allocate_rect(ui.available_rect_before_wrap(), egui::Sense::hover());
+                DockArea::new(&mut panels.bottom_tabs)
+                    .id(egui::Id::new("egui_dock::DockArea::bottom"))
+                    .show_inside(ui, &mut viewer);
+                //ui.allocate_rect(ui.available_rect_before_wrap(), egui::Sense::hover());
             })
             .response
             .rect
@@ -124,3 +200,5 @@ impl EditorPanels {
         Ok(())
     }
 }
+
+

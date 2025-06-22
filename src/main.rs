@@ -53,8 +53,8 @@ fn main() {
                 test_scene: true,
             },
             EditorPanelPlugin,
-            //EditorStepsPlugin,
-            //ToolPlugin,
+            EditorStepsPlugin,
+            ToolPlugin,
             PerfPlugin,
             ))
         .run();
