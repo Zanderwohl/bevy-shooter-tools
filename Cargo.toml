@@ -18,9 +18,11 @@ debug = false
 
 [dependencies]
 bevy = "0.16.0"
-bevy_egui = "0.34.1"
 iyes_perf_ui = { git = "https://github.com/olekspickle/iyes_perf_ui.git", branch = "main" }
 bevy_vector_shapes = "0.10.0"
+
+bevy_egui = "0.34.1"
+egui_dock = "0.16"
 
 clap = { version = "4.5.31", features = ["derive"] }
 

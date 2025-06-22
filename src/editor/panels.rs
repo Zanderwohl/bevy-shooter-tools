@@ -6,11 +6,6 @@ use bevy_egui::egui::Ui;
 use strum_macros::Display;
 use crate::editor::multicam::MulticamState;
 
-pub trait GuiPanel: Send + Sync {
-    fn name(&self) -> &str;
-    fn ui(&mut self, ui: &mut egui::Ui);
-}
-
 
 pub struct EditorPanelPlugin;
 impl Plugin for EditorPanelPlugin {
@@ -33,41 +28,11 @@ pub enum EditorPanelLocation {
 
 #[derive(Resource)]
 pub struct EditorPanels {
-    panels: HashMap<EditorPanelLocation, EditorPanel>,
-    panel_locations: HashMap<String, EditorPanelLocation>,
     toolbar_height: f32,
     top_height: f32,
     bottom_height: f32,
     left_width: f32,
     right_width: f32,
-}
-
-struct EditorPanel {
-    panels: HashMap<String, Box<dyn GuiPanel>>,
-    panel_order: Vec<String>,
-    selected_panel: usize,
-}
-
-impl EditorPanel {
-    pub fn new() -> Self {
-        Self {
-            panels: HashMap::new(),
-            panel_order: vec![],
-            selected_panel: 0,
-        }
-    }
-    
-    pub fn selected_panel_mut(&mut self) -> Option<&mut Box<dyn GuiPanel>> {
-        if self.panels.len() == 0 {
-            return None;
-        }
-        if self.selected_panel > self.panels.len() - 1 {
-            let key = self.panel_order[0].clone();
-            return Some(self.panels.get_mut(&key).unwrap())
-        }
-        let key = self.panel_order[self.selected_panel].clone();
-        Some(self.panels.get_mut(&key).unwrap())
-    }
 }
 
 pub enum PanelError {
@@ -84,15 +49,7 @@ impl Default for EditorPanels {
 
 impl EditorPanels {
     pub fn new() -> Self {
-        let mut panels = HashMap::new();
-        panels.insert(EditorPanelLocation::Left, EditorPanel::new());
-        panels.insert(EditorPanelLocation::Right, EditorPanel::new());
-        panels.insert(EditorPanelLocation::Bottom, EditorPanel::new());
-        panels.insert(EditorPanelLocation::Top, EditorPanel::new());
-
         Self {
-            panels,
-            panel_locations: HashMap::new(),
             toolbar_height: 20.0,
             top_height: 40.0,
             bottom_height: 30.0,
@@ -101,20 +58,7 @@ impl EditorPanels {
         }
     }
 
-    pub fn add_panel(&mut self, panel: Box<dyn GuiPanel>, location: EditorPanelLocation) -> Result<(), PanelError> {
-        let panel_name = panel.name().to_owned();
-        if self.panel_locations.contains_key(panel.name()) {
-            return Err(PanelError::PanelWithKeyAlreadyExists(panel_name));
-        }
-        let section = self.panels.get_mut(&location).ok_or(PanelError::SectionDoesNotExist(location.to_string()))?;
-
-        section.panels.insert(panel_name.clone(), panel);
-        self.panel_locations.insert(panel_name, location);
-
-        Ok(())
-    }
-
-    fn ui(mut panels: ResMut<Self>, mut contexts: EguiContexts, multicam_state: ResMut<MulticamState>, windows: Query<&Window, With<PrimaryWindow>>,) -> Result{
+    fn ui(mut panels: ResMut<Self>, mut contexts: EguiContexts, multicam_state: ResMut<MulticamState>, windows: Query<&Window, With<PrimaryWindow>>) -> Result{
         let ctx = contexts.try_ctx_mut();
         if ctx.is_none() {
             return Ok(());
@@ -124,7 +68,7 @@ impl EditorPanels {
         panels.top_height = egui::TopBottomPanel::top("top_panel")
             .resizable(true)
             .show(ctx, |ui| {
-                Self::ui_for_panel(&mut panels, ui, &EditorPanelLocation::Top);
+                Self::ui_for_panel(ui);
                 ui.allocate_rect(ui.available_rect_before_wrap(), egui::Sense::hover());
             })
             .response
@@ -133,7 +77,7 @@ impl EditorPanels {
         panels.left_width = egui::SidePanel::left("left_panel")
             .resizable(true)
             .show(ctx, |ui| {
-                Self::ui_for_panel(&mut panels, ui, &EditorPanelLocation::Left);
+                Self::ui_for_panel(ui);
                 ui.allocate_rect(ui.available_rect_before_wrap(), egui::Sense::hover());
             })
             .response
@@ -142,7 +86,7 @@ impl EditorPanels {
         panels.right_width = egui::SidePanel::right("right_panel")
             .resizable(true)
             .show(ctx, |ui| {
-                Self::ui_for_panel(&mut panels, ui, &EditorPanelLocation::Right);
+                Self::ui_for_panel(ui);
                 ui.allocate_rect(ui.available_rect_before_wrap(), egui::Sense::hover());
             })
             .response
@@ -151,7 +95,7 @@ impl EditorPanels {
         panels.bottom_height = egui::TopBottomPanel::bottom("bottom_panel")
             .resizable(true)
             .show(ctx, |ui| {
-                Self::ui_for_panel(&mut panels, ui, &EditorPanelLocation::Bottom);
+                Self::ui_for_panel(ui);
                 ui.allocate_rect(ui.available_rect_before_wrap(), egui::Sense::hover());
             })
             .response
@@ -161,17 +105,8 @@ impl EditorPanels {
         Self::set_multicam_size(panels, multicam_state, windows)
     }
 
-    fn ui_for_panel(mut panels: &mut ResMut<EditorPanels>, ui: &mut Ui, panel_location: &EditorPanelLocation) {
-        let panel = panels.panels.get_mut(panel_location).unwrap();
-        let active_panel = panel.selected_panel_mut();
-        match active_panel {
-            None => {
-                ui.label("Panel is empty.");
-            }
-            Some(active_panel) => {
-                active_panel.ui(ui);
-            }
-        }
+    fn ui_for_panel(ui: &mut Ui) {
+        ui.label("Panel is empty.");
     }
 
     fn set_multicam_size(panels: ResMut<Self>, mut multicam_state: ResMut<MulticamState>, windows: Query<&Window, With<PrimaryWindow>>,) -> Result {

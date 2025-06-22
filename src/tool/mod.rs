@@ -1,12 +1,12 @@
 use bevy::app::App;
 use bevy::prelude::*;
 use bevy_egui::{egui, EguiContextPass, EguiContexts};
+use bevy_egui::egui::Ui;
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
 use crate::get;
 use crate::tool::bakes::BakePlugin;
 use crate::tool::movement::MovementPlugin;
-use crate::tool::room::RoomPlugin;
 use crate::tool::selection::SelectionPlugin;
 use crate::tool::show::ShowPlugin;
 
@@ -28,7 +28,7 @@ impl Plugin for ToolPlugin {
             .add_plugins(MovementPlugin)
             .add_plugins(SelectionPlugin)
             // .add_plugins(RoomPlugin)
-            .add_systems(EguiContextPass, Self::toolbar)
+            // .add_systems(EguiContextPass, Self::toolbar)
         ;
     }
 }

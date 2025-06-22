@@ -50,11 +50,11 @@ fn main() {
         .add_plugins((
             EditorInputPlugin,
             MulticamPlugin {
-                test_scene: false,
+                test_scene: true,
             },
             EditorPanelPlugin,
-            EditorStepsPlugin,
-            ToolPlugin,
+            //EditorStepsPlugin,
+            //ToolPlugin,
             PerfPlugin,
             ))
         .run();
