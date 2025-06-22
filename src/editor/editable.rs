@@ -20,7 +20,7 @@ impl Plugin for EditorStepsPlugin {
     fn build(&self, app: &mut App) {
         app
             .init_resource::<EditorActions>()
-            .add_systems(EguiContextPass, EditorActions::ui)
+            .add_systems(EguiContextPass, EditorActions::floating_ui)
         ;
     }
 }
@@ -87,44 +87,45 @@ impl EditorActions {
     }
     
     pub fn ui(
-        mut contexts: EguiContexts,
-        mut actions: ResMut<Self>,
-        mut gizmos: Gizmos,
+        ui: &mut egui::Ui,
+        mut actions: &mut Self,
     ) {
-        let ctx = contexts.try_ctx_mut();
-        if ctx.is_none() { return; }
-        let ctx = ctx.unwrap();
-
         let mut selection_changed = false;
         let mut next_selected = actions.selected_action;
 
-        egui::Window::new(get!("editor.timeline.title")).show(ctx, |ui| {
-            egui::ScrollArea::vertical().show(ui, |ui| {
-                for id in actions.action_order.iter() {
-                    let action = actions.get_action(id).unwrap();
-                    let is_selected = actions.selected_action == Some(*id);
-                    
-                    if ui.add_sized([ui.available_width(), 0.0], 
-                        egui::SelectableLabel::new(is_selected, action.type_name_with_id())).clicked() {
-                        if is_selected {
-                            next_selected = None;
-                        } else {
-                            next_selected = Some(*id);
-                        }
-                        selection_changed = true;
+        egui::ScrollArea::vertical().show(ui, |ui| {
+            for id in actions.action_order.iter() {
+                let action = actions.get_action(id).unwrap();
+                let is_selected = actions.selected_action == Some(*id);
+
+                if ui.add_sized([ui.available_width(), 0.0],
+                    egui::SelectableLabel::new(is_selected, action.type_name_with_id())).clicked() {
+                    if is_selected {
+                        next_selected = None;
+                    } else {
+                        next_selected = Some(*id);
                     }
+                    selection_changed = true;
                 }
-            });
+            }
         });
 
         if selection_changed {
             actions.selected_action = next_selected;
         }
+    }
+    
+    fn floating_ui(mut contexts: EguiContexts, mut actions: ResMut<Self>, mut gizmos: Gizmos,) {
+        let ctx = contexts.try_ctx_mut();
+        if ctx.is_none() {
+            return;
+        }
+        let ctx = ctx.unwrap();
         
         if let Some(selected_id) = actions.selected_action {
-            let mut action = actions.actions.get_mut(&selected_id).unwrap();
+            let action = actions.actions.get_mut(&selected_id).unwrap();
             action.object.editor_ui(ctx);
-            
+
             action.object.debug_gizmos(&mut gizmos);
         }
     }

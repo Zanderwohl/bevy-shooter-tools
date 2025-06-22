@@ -1,4 +1,4 @@
-use bevy::platform::collections::HashMap;
+use bevy_egui::egui::Context;
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use bevy_egui::{egui, EguiContext, EguiContextPass, EguiContexts};
@@ -19,6 +19,7 @@ struct TabViewerAndResources<'a> {
     current_tool: &'a State<Tools>,
     next_tool: &'a mut NextState<Tools>,
     editor_actions: &'a mut EditorActions,
+    gizmos: Gizmos<'a, 'a>,
 }
 
 impl<'a> TabViewer for TabViewerAndResources<'a> {
@@ -42,6 +43,7 @@ impl<'a> TabViewer for TabViewerAndResources<'a> {
             }
             TabKinds::Timeline => {
                 ui.label("Timeline.");
+                EditorActions::ui(ui, self.editor_actions)
             }
         }
     }
@@ -118,6 +120,7 @@ impl EditorPanels {
         windows: Query<&Window, With<PrimaryWindow>>,
         
         current_tool: Res<State<Tools>>,
+        mut gizmos: Gizmos,
         mut next_tool: ResMut<NextState<Tools>>,
         mut editor_actions: ResMut<EditorActions>,
     ) -> Result{
@@ -127,8 +130,9 @@ impl EditorPanels {
         }
         let ctx = ctx.unwrap();
         
-        let mut viewer = TabViewerAndResources {
+        let mut viewer = TabViewerAndResources  {
             current_tool: & *current_tool,
+            gizmos,
             next_tool: &mut *next_tool,
             editor_actions: &mut *editor_actions,
         };
