@@ -81,3 +81,34 @@ title = "Global Point"
 
 [editor.actions.cuboid]
 title = "Cuboid"
+
+[crate_drop]
+title = "Grackle Crate Tester"
+
+[crate_drop.controls]
+title = "Crate Drop"
+new = "New Drop"
+series = "Series"
+
+[crate_drop.history]
+title = "Items"
+
+[item]
+stat_tracker = "Strange { item }"
+particle_effect = "Unusual { item }"
+
+[item.name]
+shotgun = "Shotgun"
+medigun = "Medigun"
+top_hat = "Tall Hat"
+
+[particle_effect]
+electric = "Sparky"
+
+[stat_tracker]
+tracks = "Tracks: { list }"
+kills = "Frags"
+assists = "Kill Assists"
+damage = "Damage Dealt"
+points = "Points"
+healing = "Healing"

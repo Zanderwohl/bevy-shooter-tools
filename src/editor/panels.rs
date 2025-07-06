@@ -123,7 +123,7 @@ impl EditorPanels {
         mut gizmos: Gizmos,
         mut next_tool: ResMut<NextState<Tools>>,
         mut editor_actions: ResMut<EditorActions>,
-    ) -> Result{
+    ) -> Result {
         let ctx = contexts.try_ctx_mut();
         if ctx.is_none() {
             return Ok(());

@@ -3,18 +3,46 @@ use crate::get;
 
 #[derive(Clone)]
 pub struct Item {
-    prototype: Arc<Prototype>,
-    name: Option<String>,
-    display_name_cache: Option<String>,
-    description: Option<String>,
-    stat_tracker: Option<StatTracker>,
-    particle_effect: Option<Arc<ParticleEffect>>,
-    trade_restriction: bool,
-    crafting_restriction: bool,
-    destroyed: bool,
+    pub prototype: Arc<Prototype>,
+    pub name: Option<String>,
+    pub display_name_cache: Option<String>,
+    pub description: Option<String>,
+    pub stat_tracker: Option<StatTracker>,
+    pub particle_effect: Option<Arc<ParticleEffect>>,
+    pub trade_restriction: bool,
+    pub crafting_restriction: bool,
+    pub destroyed: bool,
 }
 
 impl Item {
+    pub fn new(prototype: Arc<Prototype>) -> Self {
+        Self {
+            prototype,
+            name: None,
+            display_name_cache: None,
+            description: None,
+            stat_tracker: None,
+            particle_effect: None,
+            trade_restriction: false,
+            crafting_restriction: false,
+            destroyed: false,
+        }
+    }
+
+    pub fn new_with(prototype: Arc<Prototype>, stat_tracker: Option<StatTracker>, particle_effect: Option<Arc<ParticleEffect>>) -> Self {
+        Self {
+            prototype,
+            name: None,
+            display_name_cache: None,
+            description: None,
+            stat_tracker,
+            particle_effect,
+            trade_restriction: false,
+            crafting_restriction: false,
+            destroyed: false,
+        }
+    }
+
     pub fn display_name(&self) -> String {
         if let Some(name) = &self.name {
            return name.clone();
@@ -24,7 +52,7 @@ impl Item {
     }
 
     pub fn display_name_default(&self) -> String {
-        let mut name = get!(self.prototype.name_key);
+        let mut name = get!(format!("item.name.{}", self.prototype.name_key));
         if let Some(_) = &self.particle_effect {
             name = format!("{}", get!("item.particle_effect", "item", name));
         }
@@ -84,23 +112,24 @@ impl Item {
 
 #[derive(Clone)]
 pub struct ItemNetworkable {
-    prototype_key: String,
-    name: Option<String>,
-    description: Option<String>,
-    stat_tracker: Option<StatTracker>,
-    particle_effect_key: Option<String>,
-    trade_restriction: bool,
-    destroyed: bool,
+    pub prototype_key: String,
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub stat_tracker: Option<StatTracker>,
+    pub particle_effect_key: Option<String>,
+    pub trade_restriction: bool,
+    pub destroyed: bool,
 }
 
 #[derive(Clone)]
 pub struct Prototype {
-    name_key: String,
-    stock: bool,
-    trade_restriction: bool,
+    pub name_key: String,
+    pub stock: bool,
+    pub trade_restriction: bool,
 }
 
 impl Prototype {
+
     pub fn tradeable(&self) -> bool {
         !self.trade_restriction && !self.stock
     }
@@ -110,11 +139,55 @@ impl Prototype {
 
 #[derive(Clone)]
 pub struct StatTracker {
-    kills: Option<u32>,
-    assists: Option<u32>,
-    damage: Option<u32>,
-    points: Option<u32>,
-    healing: Option<u32>,
+    pub kills: Option<u32>,
+    pub assists: Option<u32>,
+    pub damage: Option<u32>,
+    pub points: Option<u32>,
+    pub healing: Option<u32>,
+}
+
+impl StatTracker {
+    pub fn default_kills() -> StatTracker {
+        StatTracker::default()
+    }
+
+    pub fn default_healing() -> StatTracker {
+        StatTracker {
+            kills: None,
+            healing: Some(0),
+            ..Default::default()
+        }
+    }
+
+    pub fn default_points() -> StatTracker {
+        StatTracker {
+            kills: None,
+            points: Some(0),
+            ..Default::default()
+        }
+    }
+
+    pub fn tracks_list(&self) -> String {
+        let mut tracks: Vec<&str> = Vec::new();
+
+        if self.kills.is_some() {
+            tracks.push("kills");
+        }
+        if self.assists.is_some() {
+            tracks.push("assists");
+        }
+        if self.damage.is_some() {
+            tracks.push("damage");
+        }
+        if self.points.is_some() {
+            tracks.push("points");
+        }
+        if self.healing.is_some() {
+            tracks.push("healing");
+        }
+
+        tracks.iter().map(|key| get!(format!("stat_tracker.{}", key))).collect::<Vec<String>>().join(", ")
+    }
 }
 
 impl Default for StatTracker {
@@ -129,6 +202,12 @@ impl Default for StatTracker {
     }
 }
 
-struct ParticleEffect {
-    
+pub struct ParticleEffect {
+    pub name_key: String,
+}
+
+impl ParticleEffect {
+    pub fn name(&self) -> String {
+        get!(format!("particle_effect.{}", self.name_key))
+    }
 }

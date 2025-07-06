@@ -40,3 +40,7 @@ strum_macros = "0.26.4"
 [[bin]]
 name = "ensure_lang"
 path = "src/bin/ensure_lang.rs"
+
+[[bin]]
+name = "crate_drop"
+path = "src/bin/crate_drop.rs"

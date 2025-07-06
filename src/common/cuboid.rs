@@ -97,7 +97,7 @@ impl CuboidPoint {
     }
 
     pub fn plane_centers_for_bounds(&self, min: Vec3, max: Vec3) -> Vec<Vec3> {
-        PLANE_CENTERS.iter().map(|point| {
+        (&PLANE_CENTERS).iter().map(|point| {
             point.resolve_in_bounds(min, max)
         }).collect()
     }
