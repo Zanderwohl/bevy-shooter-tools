@@ -85,12 +85,14 @@ fn setup(
 #[derive(Resource)]
 struct State {
     items: Vec<Item>,
+    selected_item: Option<usize>,
 }
 
 impl Default for State {
     fn default() -> Self {
         Self {
             items: Vec::new(),
+            selected_item: None,
         }
     }
 }
@@ -117,11 +119,21 @@ fn ui(
         ui.heading(get!("crate_drop.history.title"));
 
         ScrollArea::vertical().show(ui, |ui| {
-            for item in &state.items {
+            let mut new_selected = None;
+            
+            for (idx, item) in state.items.iter().enumerate() {
                 ui.separator();
                 
                 ui.vertical(|ui| {
-                    ui.label(item.display_name());
+                    ui.horizontal(|ui| {
+                        ui.label(item.display_name());
+                        if let Some(selected) = state.selected_item && idx == selected {
+                            ui.disable();
+                        }
+                        if ui.button(get!("crate_drop.controls.select")).clicked() {
+                            new_selected = Some(idx);
+                        }
+                    });
                     if let Some(particle_effect) = &item.particle_effect {
                         ui.label(particle_effect.name());
                     }
@@ -129,6 +141,10 @@ fn ui(
                         ui.label(get!("stat_tracker.tracks", "list", stat_tracker.tracks_list()));
                     }
                 });
+            }
+            
+            if let Some(new_selected) = new_selected {
+                state.selected_item = Some(new_selected);
             }
         });
     });

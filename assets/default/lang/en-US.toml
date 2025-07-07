@@ -89,6 +89,7 @@ title = "Grackle Crate Tester"
 title = "Crate Drop"
 new = "New Drop"
 series = "Series"
+select = "Select"
 
 [crate_drop.history]
 title = "Items"
