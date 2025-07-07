@@ -36,6 +36,7 @@ regex = "1.11.1"
 
 strum = "0.27.1"
 strum_macros = "0.26.4"
+rand = "0.8.5"
 
 [[bin]]
 name = "ensure_lang"

@@ -7,6 +7,7 @@ use bevy::window::{ExitCondition, PresentMode};
 use bevy_egui::{egui, EguiContextPass, EguiContexts, EguiPlugin};
 use bevy_egui::egui::{Frame, ScrollArea, Sense, UiBuilder};
 use grackle::common::item::item::{Item, ParticleEffect, Prototype, StatTracker};
+use grackle::unlock::unlock;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let editor_params = startup::EditorParams::new()
@@ -94,7 +95,7 @@ impl Default for State {
         Self {
             items: Vec::new(),
             selected_item: None,
-            series: 0,
+            series: 1,
         }
     }
 }
@@ -116,6 +117,7 @@ fn ui(
 
         // Top half
         ui.vertical(|ui| {
+            ui.set_min_width(ui.available_width());
             ui.set_min_height(half_height);
             ui.set_max_height(half_height);
             ScrollArea::vertical().show(ui, |ui| {
@@ -123,11 +125,13 @@ fn ui(
                 ui.add_space(32.0);
 
                 if ui.button(get!("crate_drop.controls.new")).clicked() {
-                    ui.set_min_width(ui.available_width());
+                    if let Some(item) = unlock(state.series) {
+                        state.items.push(item);
+                    }
                 }
 
                 ui.add_space(32.0);
-                ui.add(egui::Slider::new(&mut state.series, 1..=5).text(get!("crate_drop.controls.series")));
+                ui.add(egui::Slider::new(&mut state.series, 0..=5).text(get!("crate_drop.controls.series")));
             });
         });
 
@@ -146,12 +150,17 @@ fn ui(
 
                     ui.label(item.display_name());
 
-                    ui.add_space(32.0);
+                    ui.add_space(16.0);
                     if let Some(particle_effect) = &item.particle_effect {
+                        ui.heading(get!("item.particle_effect_adj"));
+                        ui.label(get!("item.particle_effect_info"));
                         ui.label(particle_effect.name());
                     }
+                    ui.add_space(16.0);
                     if let Some(stat_tracker) = &item.stat_tracker {
-                        ui.label(get!("stat_tracker.tracks", "list", stat_tracker.tracks_list()));
+                        ui.heading(get!("item.stat_tracker_adj"));
+                        ui.label(get!("item.stat_tracker_info"));
+                        ui.label(stat_tracker.tracks_list());
                     }
                 }
             }

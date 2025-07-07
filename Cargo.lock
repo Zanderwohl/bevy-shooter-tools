@@ -2793,6 +2793,7 @@ dependencies = [
  "egui_dock",
  "iyes_perf_ui",
  "lazy_static",
+ "rand",
  "regex",
  "serde",
  "serde_json",

@@ -135,6 +135,20 @@ impl Prototype {
     }
     
     pub fn craftable(&self) -> bool { !self.stock }
+
+    pub fn as_item(prototype: Arc<Prototype>) -> Item {
+        Item {
+            prototype: prototype.clone(),
+            name: None,
+            display_name_cache: None,
+            description: None,
+            stat_tracker: None,
+            particle_effect: None,
+            trade_restriction: false,
+            crafting_restriction: false,
+            destroyed: false,
+        }
+    }
 }
 
 #[derive(Clone)]

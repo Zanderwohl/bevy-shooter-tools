@@ -99,7 +99,11 @@ none = "No item selected."
 title = "Items"
 
 [item]
+stat_tracker_adj = "Strange"
+stat_tracker_info = "Item tracks statistics about this item's use in matches."
 stat_tracker = "Strange { item }"
+particle_effect_adj = "Unusual"
+particle_effect_info = "Item has a special particle effect."
 particle_effect = "Unusual { item }"
 
 [item.name]
@@ -115,5 +119,5 @@ tracks = "Tracks: { list }"
 kills = "Frags"
 assists = "Kill Assists"
 damage = "Damage Dealt"
-points = "Points"
+points = "Points Scored"
 healing = "Healing"
