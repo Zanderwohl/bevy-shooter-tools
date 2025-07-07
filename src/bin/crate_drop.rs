@@ -5,7 +5,7 @@ use grackle::common;
 use bevy::prelude::*;
 use bevy::window::{ExitCondition, PresentMode};
 use bevy_egui::{egui, EguiContextPass, EguiContexts, EguiPlugin};
-use bevy_egui::egui::ScrollArea;
+use bevy_egui::egui::{Frame, ScrollArea, Sense, UiBuilder};
 use grackle::common::item::item::{Item, ParticleEffect, Prototype, StatTracker};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -86,6 +86,7 @@ fn setup(
 struct State {
     items: Vec<Item>,
     selected_item: Option<usize>,
+    series: u32,
 }
 
 impl Default for State {
@@ -93,6 +94,7 @@ impl Default for State {
         Self {
             items: Vec::new(),
             selected_item: None,
+            series: 0,
         }
     }
 }
@@ -108,11 +110,52 @@ fn ui(
     let ctx = ctx.unwrap();
     
     egui::SidePanel::left("left_panel").show(ctx, |ui| {
-        ui.heading(get!("crate_drop.controls.title"));
-        
-        if ui.button(get!("crate_drop.controls.new")).clicked() {
-            
-        }
+        ui.set_min_width(200.0);
+
+        let half_height = ui.available_height() / 2.0;
+
+        // Top half
+        ui.vertical(|ui| {
+            ui.set_min_height(half_height);
+            ui.set_max_height(half_height);
+            ScrollArea::vertical().show(ui, |ui| {
+                ui.heading(get!("crate_drop.controls.title"));
+                ui.add_space(32.0);
+
+                if ui.button(get!("crate_drop.controls.new")).clicked() {
+                    ui.set_min_width(ui.available_width());
+                }
+
+                ui.add_space(32.0);
+                ui.add(egui::Slider::new(&mut state.series, 1..=5).text(get!("crate_drop.controls.series")));
+            });
+        });
+
+        ui.separator();
+
+        // Bottom half
+        ScrollArea::vertical().show(ui, |ui| {
+            // This should be the vertical halfway point.
+            ui.heading(get!("crate_drop.details.title"));
+            match state.selected_item {
+                None => {
+                    ui.label(get!("crate_drop.details.none"));
+                }
+                Some(selected_idx) => {
+                    let item = &state.items[selected_idx];
+
+                    ui.label(item.display_name());
+
+                    ui.add_space(32.0);
+                    if let Some(particle_effect) = &item.particle_effect {
+                        ui.label(particle_effect.name());
+                    }
+                    if let Some(stat_tracker) = &item.stat_tracker {
+                        ui.label(get!("stat_tracker.tracks", "list", stat_tracker.tracks_list()));
+                    }
+                }
+            }
+        });
     });
     
     egui::SidePanel::right("right_panel").show(ctx, |ui| {
@@ -122,23 +165,49 @@ fn ui(
             let mut new_selected = None;
             
             for (idx, item) in state.items.iter().enumerate() {
-                ui.separator();
-                
+                ui.set_min_width(200.0);
                 ui.vertical(|ui| {
-                    ui.horizontal(|ui| {
-                        ui.label(item.display_name());
-                        if let Some(selected) = state.selected_item && idx == selected {
-                            ui.disable();
-                        }
-                        if ui.button(get!("crate_drop.controls.select")).clicked() {
-                            new_selected = Some(idx);
-                        }
-                    });
-                    if let Some(particle_effect) = &item.particle_effect {
-                        ui.label(particle_effect.name());
-                    }
-                    if let Some(stat_tracker) = &item.stat_tracker {
-                        ui.label(get!("stat_tracker.tracks", "list", stat_tracker.tracks_list()));
+                    let response = ui
+                        .scope_builder(
+                            UiBuilder::new()
+                                .id_salt(format!("item_container_{}", idx + 1))
+                                .sense(Sense::click())
+                            ,
+                            |ui| {
+                                let response = ui.response();
+                                let is_selected = state.selected_item == Some(idx);
+                                let visuals = ui.style().interact_selectable(&response, is_selected);
+
+                                let inactive_visuals = &ui.style().visuals.widgets.inactive;
+                                let mut stroke = visuals.bg_stroke;
+                                stroke.width = inactive_visuals.bg_stroke.width;
+
+                                Frame::canvas(ui.style())
+                                    .fill(visuals.bg_fill)
+                                    .stroke(stroke) 
+                                    .inner_margin(ui.spacing().menu_margin)
+                                    .show(ui, |ui| {
+                                        let was_selectable = ui.style_mut().interaction.selectable_labels;
+                                        ui.style_mut().interaction.selectable_labels = false;
+
+                                        ui.set_min_width(ui.available_width());
+                                        ui.label(item.display_name());
+
+                                        ui.add_space(32.0);
+                                        if let Some(particle_effect) = &item.particle_effect {
+                                            ui.label(particle_effect.name());
+                                        }
+                                        if let Some(stat_tracker) = &item.stat_tracker {
+                                            ui.label(get!("stat_tracker.tracks", "list", stat_tracker.tracks_list()));
+                                        }
+
+                                        ui.style_mut().interaction.selectable_labels = was_selectable;
+                                    });
+                            })
+                        .response;
+
+                    if response.clicked() {
+                        new_selected = Some(idx);
                     }
                 });
             }

@@ -91,6 +91,10 @@ new = "New Drop"
 series = "Series"
 select = "Select"
 
+[crate_drop.details]
+title = "Item Details"
+none = "No item selected."
+
 [crate_drop.history]
 title = "Items"
 
