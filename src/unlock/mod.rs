@@ -1,13 +1,15 @@
 use std::collections::HashMap;
 use std::sync::Arc;
+use bevy::prelude::warn;
 use lazy_static::lazy_static;
 use rand::Rng;
 use crate::common::item::item;
-use crate::common::item::item::{Item, Prototype, StatTracker};
+use crate::common::item::item::{Item, ParticleEffect, Prototype, StatTracker};
 
 lazy_static! {
     static ref PROTOTYPES: HashMap<String, Arc<item::Prototype>> = init_prototype_map();
     static ref SERIES: Vec<CrateSeries> = init_crate_series();
+    static ref PARTICLES: HashMap<String, Arc<item::ParticleEffect>> = init_particle_effects();
 }
 
 pub struct CrateSeries {
@@ -40,11 +42,22 @@ impl CrateSeries {
                 let key = &entry.prototype_key;
                 let prototype = PROTOTYPES.get(key)?.clone();
 
-                let mut item = Prototype::as_item(prototype);
+                let mut item = Item::new(prototype);
                 if let Some(stat_tracker) = &entry.stat_tracker {
                     item.stat_tracker = Some(stat_tracker.clone());
                 }
-                // TODO: mutate item to add particle effect
+                if let Some(particle_effect_key) = &entry.particle_effect_key {
+                    let effect = PARTICLES.get(particle_effect_key);
+                    match effect {
+                        None => {
+                            warn!("Particle effect was not found for key `{}`! Item was given, but without effect.", particle_effect_key);
+                        }
+                        Some(effect) => {
+                            let effect = effect.clone();
+                            item.particle_effect = Some(effect);
+                        }
+                    }
+                }
                 return Some(item);
             }
         }
@@ -97,8 +110,8 @@ fn init_crate_series() -> Vec<CrateSeries> {
         "".to_string(),
         1,
         vec![
-            CrateSeriesEntry::new_with("shotgun", 200, None, Some(StatTracker::default_points())),
-            CrateSeriesEntry::new_with("medigun", 100, None, Some(StatTracker::default_healing())),
+            CrateSeriesEntry::new_with("shotgun", 200, Some("electric".into()), Some(StatTracker::default_points())),
+            CrateSeriesEntry::new_with("medigun", 100, Some("fire".into()), Some(StatTracker::default_healing())),
         ],
     ));
 
@@ -125,6 +138,22 @@ fn init_prototype_map() -> HashMap<String, Arc<Prototype>> {
     }));
 
     prototypes
+}
+
+fn init_particle_effects() -> HashMap<String, Arc<item::ParticleEffect>> {
+    let mut effects: HashMap<String, Arc<item::ParticleEffect>> = HashMap::new();
+
+    effects.insert("electric".to_owned(), Arc::new(ParticleEffect {
+        name_key: "electric".to_owned(),
+    }));
+    effects.insert("fire".to_owned(), Arc::new(ParticleEffect {
+        name_key: "fire".to_owned(),
+    }));
+    effects.insert("fire-blue".to_owned(), Arc::new(ParticleEffect {
+        name_key: "fire-blue".to_owned(),
+    }));
+
+    effects
 }
 
 pub fn unlock(series: u32) -> Option<item::Item> {

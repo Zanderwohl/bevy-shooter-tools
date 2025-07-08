@@ -109,10 +109,12 @@ particle_effect = "Unusual { item }"
 [item.name]
 shotgun = "Shotgun"
 medigun = "Medigun"
-top_hat = "Tall Hat"
+top_hat = "Honest Abe"
 
 [particle_effect]
 electric = "Sparky"
+fire = "Stop, Drop, n' Roll"
+fire-blue = "Industrial Fire"
 
 [stat_tracker]
 tracks = "Tracks: { list }"

@@ -40,47 +40,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             EguiPlugin { enable_multipass_for_primary_context: true },
         ))
         .init_resource::<State>()
-        .add_systems(Startup, setup)
         .add_systems(EguiContextPass, ui)
         .run();
     ;
     Ok(())
-}
-
-fn setup(
-    mut state: ResMut<State>,
-) {
-    let shotgun = Arc::new(Prototype {
-        name_key: "shotgun".to_owned(),
-        stock: true,
-        trade_restriction: false,
-    });
-    let medigun = Arc::new(Prototype {
-        name_key: "medigun".to_owned(),
-        stock: true,
-        trade_restriction: false,
-    });
-    let top_hat = Arc::new(Prototype {
-        name_key: "top_hat".to_owned(),
-        stock: false,
-        trade_restriction: false,
-    });
-    let electric = Arc::new(ParticleEffect {
-        name_key: "electric".to_owned(),
-    });
-    
-    state.items.push(Item::new(shotgun.clone()));
-    state.items.push(Item::new_with(shotgun.clone(), Some(StatTracker {
-        kills: Some(0),
-        assists: Some(0),
-        damage: Some(0),
-        ..Default::default()
-    }), None));
-    state.items.push(Item::new(medigun.clone()));
-    state.items.push(Item::new_with(medigun.clone(), Some(StatTracker::default_healing()), None));
-    state.items.push(Item::new_with(top_hat.clone(), None, None));
-    state.items.push(Item::new_with(top_hat.clone(), Some(StatTracker::default_points()), None));
-    state.items.push(Item::new_with(top_hat.clone(), Some(StatTracker::default_points()), Some(electric.clone())));
 }
 
 #[derive(Resource)]
