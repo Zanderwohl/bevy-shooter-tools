@@ -17,7 +17,7 @@ incremental = false
 debug = false
 
 [dependencies]
-bevy = "0.16.0"
+bevy = "0.16.1"
 iyes_perf_ui = { git = "https://github.com/olekspickle/iyes_perf_ui.git", branch = "main" }
 bevy_vector_shapes = "0.10.0"
 
@@ -37,6 +37,12 @@ regex = "1.11.1"
 strum = "0.27.1"
 strum_macros = "0.26.4"
 rand = "0.8.5"
+
+objc2 = { version = "0.6.1", features = ["relax-sign-encoding"] }
+
+# Top-level Cargo.toml
+[profile.dev.package.objc2]
+debug-assertions = false
 
 [[bin]]
 name = "ensure_lang"

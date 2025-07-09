@@ -33,7 +33,7 @@ fn main() {
             .set(WindowPlugin {
                primary_window: Some(Window {
                    title: get!("editor.title"),
-                   name: Some("grackle-editor.app".to_owned()),
+                   name: Some("grackle.app".to_owned()),
                    present_mode: PresentMode::AutoVsync,
                    prevent_default_event_handling: true,
                    visible: true,
