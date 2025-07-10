@@ -144,6 +144,7 @@ pub struct StatTracker {
     pub damage: Option<u32>,
     pub points: Option<u32>,
     pub healing: Option<u32>,
+    pub invulns: Option<u32>,
 }
 
 impl StatTracker {
@@ -198,6 +199,7 @@ impl Default for StatTracker {
             damage: None,
             points: None,
             healing: None,
+            invulns: None,
         }
     }
 }

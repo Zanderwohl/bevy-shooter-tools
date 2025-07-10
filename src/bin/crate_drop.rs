@@ -112,15 +112,25 @@ fn ui(
                     let item = &state.items[selected_idx];
 
                     ui.label(item.display_name());
+                    // get!("item.trade_restriction")
 
-                    ui.add_space(16.0);
+                    if item.trade_restriction || item.crafting_restriction {
+                        ui.add_space(16.0);
+                    }
+                    if item.trade_restriction {
+                        ui.label(get!("item.trade_restriction"));
+                    }
+                    if item.crafting_restriction {
+                        ui.label(get!("item.crafting_restriction"));
+                    }
                     if let Some(particle_effect) = &item.particle_effect {
+                        ui.add_space(16.0);
                         ui.heading(get!("item.particle_effect_adj"));
                         ui.label(get!("item.particle_effect_info"));
                         ui.label(particle_effect.name());
                     }
-                    ui.add_space(16.0);
                     if let Some(stat_tracker) = &item.stat_tracker {
+                        ui.add_space(16.0);
                         ui.heading(get!("item.stat_tracker_adj"));
                         ui.label(get!("item.stat_tracker_info"));
                         ui.label(stat_tracker.tracks_list());

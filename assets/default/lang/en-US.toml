@@ -105,6 +105,8 @@ stat_tracker = "Strange { item }"
 particle_effect_adj = "Unusual"
 particle_effect_info = "Item has a special particle effect."
 particle_effect = "Unusual { item }"
+trade_restriction = "Not tradeable."
+crafting_restriction = "Not craftable."
 
 [item.name]
 shotgun = "Shotgun"

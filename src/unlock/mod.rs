@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use bevy::prelude::warn;
+use bevy::ui::AlignItems::Default;
 use lazy_static::lazy_static;
 use rand::Rng;
 use crate::common::item::item;
@@ -39,26 +40,7 @@ impl CrateSeries {
         for entry in &self.entries {
             current_odds += entry.odds;
             if random_number < current_odds {
-                let key = &entry.prototype_key;
-                let prototype = PROTOTYPES.get(key)?.clone();
-
-                let mut item = Item::new(prototype);
-                if let Some(stat_tracker) = &entry.stat_tracker {
-                    item.stat_tracker = Some(stat_tracker.clone());
-                }
-                if let Some(particle_effect_key) = &entry.particle_effect_key {
-                    let effect = PARTICLES.get(particle_effect_key);
-                    match effect {
-                        None => {
-                            warn!("Particle effect was not found for key `{}`! Item was given, but without effect.", particle_effect_key);
-                        }
-                        Some(effect) => {
-                            let effect = effect.clone();
-                            item.particle_effect = Some(effect);
-                        }
-                    }
-                }
-                return Some(item);
+                return entry.unbox_one()
             }
         }
         
@@ -68,26 +50,171 @@ impl CrateSeries {
 
 pub struct CrateSeriesEntry {
     pub prototype_key: String,
-    pub particle_effect_key: Option<String>,
-    pub stat_tracker: Option<StatTracker>,
+    pub particle_effects: Vec<ParticleEffectEntry>,
+    pub total_particle_effect_odds: i32,
+    pub stat_trackers: Vec<StatTrackerEntry>,
+    pub total_stat_tracker_odds: i32,
     pub odds: i32,
+    pub allow_plain: bool,
 }
 
 impl CrateSeriesEntry {
     pub fn new(prototype_key: &str, odds: i32) -> CrateSeriesEntry {
         Self {
             prototype_key: prototype_key.to_owned(),
+            particle_effects: Vec::new(),
+            stat_trackers: Vec::new(),
+            odds,
+            allow_plain: true,
+            total_particle_effect_odds: 0,
+            total_stat_tracker_odds: 0,
+        }
+    }
+
+    pub fn new_with(prototype_key: &str, odds: i32, particle_effects: Vec<ParticleEffectEntry>, stat_trackers: Vec<StatTrackerEntry>) -> Self {
+        let mut entry = CrateSeriesEntry::new(prototype_key, odds);
+        for particle_effect in particle_effects {
+            entry.particle_effects.push(particle_effect);
+        }
+        for stat_tracker in stat_trackers {
+            entry.stat_trackers.push(stat_tracker);
+        }
+        entry
+    }
+
+    pub fn add_particle_effect(&mut self, particle_effect: ParticleEffectEntry) {
+        self.total_particle_effect_odds += particle_effect.odds;
+        self.particle_effects.push(particle_effect);
+    }
+    
+    pub fn add_stat_tracker(&mut self, stat_tracker: StatTrackerEntry) {
+        self.total_stat_tracker_odds += stat_tracker.odds;
+        self.stat_trackers.push(stat_tracker);
+    }
+    
+    pub fn unbox_one(&self) -> Option<item::Item> {
+        let key = &self.prototype_key;
+        let prototype = PROTOTYPES.get(key)?.clone();
+
+        let mut item = Item::new(prototype);
+
+        let mut effect: Option<Arc<ParticleEffect>> = None;
+        let mut stat_tracker: Option<StatTracker> = None;
+        
+        'create: loop  {
+            if self.total_particle_effect_odds > 0 {
+                let mut current_odds = 0;
+                let random_number = rand::thread_rng().gen_range(0..self.total_particle_effect_odds);
+                for entry in &self.particle_effects {
+                    current_odds += entry.odds;
+                    if random_number < current_odds {
+                        if let Some(key) = &entry.particle_effect_key && let Some(selected_effect) = PARTICLES.get(key) {
+                            effect = Some(selected_effect.clone());
+                        }
+                    }
+                }
+            }
+
+            if self.total_stat_tracker_odds > 0 {
+                let random_number = rand::thread_rng().gen_range(0..self.total_stat_tracker_odds);
+                let mut current_odds = 0;
+                for entry in &self.stat_trackers {
+                    current_odds += entry.odds;
+                    if random_number < current_odds {
+                        if let Some(new_stat_tracker) = &entry.stat_tracker {
+                            stat_tracker = Some(new_stat_tracker.clone());
+                        }
+                    }
+                }
+
+            }
+            
+            if self.allow_plain || effect.is_some() || stat_tracker.is_some() { break 'create; }
+        }
+        
+        Some(item)
+    }
+}
+
+pub struct ParticleEffectEntry {
+    pub particle_effect_key: Option<String>,
+    pub odds: i32,
+}
+
+impl ParticleEffectEntry {
+    pub fn none(odds: i32) -> ParticleEffectEntry {
+        Self {
             particle_effect_key: None,
+            odds,
+        }
+    }
+
+    pub fn some(odds: i32, particle_effect_key: String) -> ParticleEffectEntry {
+        Self {
+            particle_effect_key: Some(particle_effect_key),
+            odds,
+        }
+    }
+}
+
+pub struct StatTrackerEntry {
+    pub stat_tracker: Option<StatTracker>,
+    pub odds: i32,
+}
+
+impl StatTrackerEntry {
+    pub fn none(odds: i32) -> Self {
+        Self {
             stat_tracker: None,
             odds,
         }
     }
 
-    pub fn new_with(prototype_key: &str, odds: i32, particle_effect_key: Option<String>, stat_tracker: Option<StatTracker>) -> CrateSeriesEntry {
+    pub fn kills(odds: i32) -> Self {
         Self {
-            prototype_key: prototype_key.to_owned(),
-            particle_effect_key,
-            stat_tracker,
+            stat_tracker: Some(StatTracker::default_kills()),
+            odds,
+        }
+    }
+
+    pub fn max_weapon(odds: i32) -> Self {
+        Self {
+            stat_tracker: Some(StatTracker {
+                kills: Some(0),
+                assists: Some(0),
+                damage: Some(0),
+                points: Some(0),
+                healing: None,
+                invulns: None,
+            }),
+            odds,
+        }
+    }
+
+    pub fn healing(odds: i32) -> Self {
+        Self {
+            stat_tracker: Some(StatTracker::default_healing()),
+            odds,
+        }
+    }
+
+    pub fn max_medigun(odds: i32) -> Self {
+        Self {
+            stat_tracker: Some(StatTracker {
+                kills: None,
+                assists: None,
+                damage: None,
+                points: None,
+                healing: Some(0),
+                invulns: Some(0),
+            }),
+            odds,
+        }
+    }
+
+    pub fn points(odds: i32) -> Self {
+        Self {
+            stat_tracker: Some(StatTracker::default_points()),
             odds,
         }
     }
@@ -97,7 +224,7 @@ fn init_crate_series() -> Vec<CrateSeries> {
     let mut series = Vec::new();
 
     series.push(CrateSeries::new(
-        "".to_string(),
+        "Stock Items".to_string(),
         0,
         vec![
             CrateSeriesEntry::new("shotgun", 200),
@@ -110,8 +237,35 @@ fn init_crate_series() -> Vec<CrateSeries> {
         "".to_string(),
         1,
         vec![
-            CrateSeriesEntry::new_with("shotgun", 200, Some("electric".into()), Some(StatTracker::default_points())),
-            CrateSeriesEntry::new_with("medigun", 100, Some("fire".into()), Some(StatTracker::default_healing())),
+            CrateSeriesEntry::new_with("shotgun", 100,
+                                       vec![],
+                                       vec![
+                                           StatTrackerEntry::none(100),
+                                           StatTrackerEntry::kills(100),
+                                           StatTrackerEntry::max_weapon(100),
+                                       ],
+            ),
+            CrateSeriesEntry::new_with("medigun", 100,
+                                       vec![],
+                                       vec![
+                                           StatTrackerEntry::none(100),
+                                           StatTrackerEntry::healing(100),
+                                           StatTrackerEntry::max_medigun(100),
+                                       ],
+            ),
+            CrateSeriesEntry::new_with("top_hat", 100,
+            vec![
+                // electric, fire, fire-blue
+                ParticleEffectEntry::none(100),
+                ParticleEffectEntry::some(100, "electric".to_owned()),
+                ParticleEffectEntry::some(100, "fire".to_owned()),
+                ParticleEffectEntry::some(100, "fire-blue".to_owned()),
+            ],
+            vec![
+                StatTrackerEntry::none(100),
+                StatTrackerEntry::points(100),
+            ],
+            ),
         ],
     ));
 
