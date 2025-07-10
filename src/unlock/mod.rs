@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
-use bevy::prelude::warn;
+use bevy::prelude::{warn, info};
 use bevy::ui::AlignItems::Default;
 use lazy_static::lazy_static;
 use rand::Rng;
@@ -75,10 +75,10 @@ impl CrateSeriesEntry {
     pub fn new_with(prototype_key: &str, odds: i32, particle_effects: Vec<ParticleEffectEntry>, stat_trackers: Vec<StatTrackerEntry>) -> Self {
         let mut entry = CrateSeriesEntry::new(prototype_key, odds);
         for particle_effect in particle_effects {
-            entry.particle_effects.push(particle_effect);
+            entry.add_particle_effect(particle_effect);
         }
         for stat_tracker in stat_trackers {
-            entry.stat_trackers.push(stat_tracker);
+            entry.add_stat_tracker(stat_tracker);
         }
         entry
     }
@@ -103,16 +103,20 @@ impl CrateSeriesEntry {
         let mut stat_tracker: Option<StatTracker> = None;
 
         let mut loops = 0;
+        info!("Particle effect odds: {}; Stat tracker odds: {}", self.total_particle_effect_odds, self.total_stat_tracker_odds);
         
         'create: loop  {
             loops += 1;
             if self.total_particle_effect_odds > 0 {
                 let mut current_odds = 0;
                 let random_number = rand::thread_rng().gen_range(0..self.total_particle_effect_odds);
+                info!("Particle effect: {}", random_number);
                 for entry in &self.particle_effects {
                     current_odds += entry.odds;
-                    if random_number < current_odds {
+                    info!("\tCurrent odds: {} (+{}) - {}", current_odds, entry.odds, random_number < current_odds);
+                    if random_number < current_odds && effect.is_none() {
                         if let Some(key) = &entry.particle_effect_key && let Some(selected_effect) = PARTICLES.get(key) {
+                            info!("\t\tSetting!");
                             effect = Some(selected_effect.clone());
                         }
                     }
@@ -122,10 +126,13 @@ impl CrateSeriesEntry {
             if self.total_stat_tracker_odds > 0 {
                 let random_number = rand::thread_rng().gen_range(0..self.total_stat_tracker_odds);
                 let mut current_odds = 0;
+                info!("Stat tracker: {}", random_number);
                 for entry in &self.stat_trackers {
                     current_odds += entry.odds;
-                    if random_number < current_odds {
+                    info!("\tCurrent odds: {} (+{}) - {}", current_odds, entry.odds, random_number < current_odds);
+                    if random_number < current_odds && stat_tracker.is_none() {
                         if let Some(new_stat_tracker) = &entry.stat_tracker {
+                            info!("\t\tSetting!");
                             stat_tracker = Some(new_stat_tracker.clone());
                         }
                     }
@@ -143,6 +150,9 @@ impl CrateSeriesEntry {
                 break 'create;
             }
         }
+
+        item.stat_tracker = stat_tracker;
+        item.particle_effect = effect;
         
         Some(item)
     }
