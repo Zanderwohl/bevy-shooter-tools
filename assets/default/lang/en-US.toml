@@ -85,6 +85,10 @@ title = "Cuboid"
 [crate_drop]
 title = "Grackle Crate Tester"
 
+[crate_drop.error]
+no_odds = "A crate series entry for { item } cannot be plain but it has no quality entries!"
+quality_loop = "A crate unlock for { item } got stuck in a loop while determining qualities!"
+
 [crate_drop.controls]
 title = "Crate Drop"
 new = "New Drop"

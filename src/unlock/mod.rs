@@ -6,6 +6,7 @@ use lazy_static::lazy_static;
 use rand::Rng;
 use crate::common::item::item;
 use crate::common::item::item::{Item, ParticleEffect, Prototype, StatTracker};
+use crate::get;
 
 lazy_static! {
     static ref PROTOTYPES: HashMap<String, Arc<item::Prototype>> = init_prototype_map();
@@ -65,7 +66,7 @@ impl CrateSeriesEntry {
             particle_effects: Vec::new(),
             stat_trackers: Vec::new(),
             odds,
-            allow_plain: true,
+            allow_plain: false,
             total_particle_effect_odds: 0,
             total_stat_tracker_odds: 0,
         }
@@ -100,8 +101,11 @@ impl CrateSeriesEntry {
 
         let mut effect: Option<Arc<ParticleEffect>> = None;
         let mut stat_tracker: Option<StatTracker> = None;
+
+        let mut loops = 0;
         
         'create: loop  {
+            loops += 1;
             if self.total_particle_effect_odds > 0 {
                 let mut current_odds = 0;
                 let random_number = rand::thread_rng().gen_range(0..self.total_particle_effect_odds);
@@ -128,8 +132,16 @@ impl CrateSeriesEntry {
                 }
 
             }
-            
+
+            if !self.allow_plain && self.total_stat_tracker_odds == 0 && self.total_particle_effect_odds > 0 {
+                warn!("{}", get!("create_drop.error.no_odds", "item", self.prototype_key));
+                break 'create
+            }
             if self.allow_plain || effect.is_some() || stat_tracker.is_some() { break 'create; }
+            if loops >= 10 {
+                warn!("{}", get!("crate_drop.error.quality_loop", "item", self.prototype_key));
+                break 'create;
+            }
         }
         
         Some(item)
