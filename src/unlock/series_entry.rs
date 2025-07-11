@@ -64,7 +64,7 @@ impl CrateSeriesEntry {
         let mut stat_tracker: Option<StatTracker> = None;
 
         let mut loops = 0;
-        let loop_limit = (self.particle_effects.len() + self.stat_trackers.len()) as i32 * 10;
+        let loop_limit = (self.particle_effects.len() + self.stat_trackers.len()) as i32 * 10; // TODO: This is nuts. Are we potentially looping thousands of times?
         info!("Particle effect odds: {}; Stat tracker odds: {}", self.total_particle_effect_odds, self.total_stat_tracker_odds);
 
         'create: loop  {
