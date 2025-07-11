@@ -1,4 +1,3 @@
-use std::sync::Arc;
 use grackle::{get, startup};
 use grackle::common;
 
@@ -6,8 +5,8 @@ use bevy::prelude::*;
 use bevy::window::{ExitCondition, PresentMode};
 use bevy_egui::{egui, EguiContextPass, EguiContexts, EguiPlugin};
 use bevy_egui::egui::{Frame, ScrollArea, Sense, UiBuilder};
-use grackle::common::item::item::{Item, ParticleEffect, Prototype, StatTracker};
-use grackle::unlock::unlock;
+use grackle::common::item::item::Item;
+use grackle::unlock::{unlock, UnlockProblem};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let editor_params = startup::EditorParams::new()
@@ -88,8 +87,11 @@ fn ui(
                 ui.add_space(32.0);
 
                 if ui.button(get!("crate_drop.controls.new")).clicked() {
-                    if let Some(item) = unlock(state.series) {
-                        state.items.push(item);
+                    match unlock(state.series) {
+                        Ok(item) => state.items.push(item),
+                        Err(err) => {
+                            error!("{}", err);
+                        }
                     }
                 }
 

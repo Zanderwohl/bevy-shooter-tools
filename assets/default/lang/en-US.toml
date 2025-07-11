@@ -86,8 +86,11 @@ title = "Cuboid"
 title = "Grackle Crate Tester"
 
 [crate_drop.error]
-no_odds = "A crate series entry for { item } cannot be plain but it has no quality entries!"
-quality_loop = "A crate unlock for { item } got stuck in a loop while determining qualities!"
+no_odds = "A crate series entry for `{ item }` cannot be plain but it has no quality entries!"
+quality_loop = "A crate unlock for `{ item }` got stuck in a loop while determining qualities!"
+no_such_series = "A crate unlock was tried on a crate with series `{ series }` but no such series exists!"
+no_such_prototype = "During a crate unlock, the selected entry wanted to crate a `{ prototype }`, but no such prototype exists."
+invalid_entry_choice = "The crate drop RNG generated the number `{ entry }` which does not exist in the series."
 
 [crate_drop.controls]
 title = "Crate Drop"
