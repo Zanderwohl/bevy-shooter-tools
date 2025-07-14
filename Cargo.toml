@@ -2,6 +2,7 @@
 name = "grackle"
 version = "0.1.0"
 edition = "2024"
+default-run = "editor"
 
 [profile.dev.package."*"]
 opt-level = 3
@@ -43,6 +44,10 @@ objc2 = { version = "0.6.1", features = ["relax-sign-encoding"] }
 # Top-level Cargo.toml
 [profile.dev.package.objc2]
 debug-assertions = false
+
+[[bin]]
+name = "editor"
+path = "src/main.rs"
 
 [[bin]]
 name = "ensure_lang"
